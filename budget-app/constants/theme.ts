@@ -46,6 +46,10 @@ export const colors = {
   surfaceInverse: "#141414",
   /** Затемнение под модальным шитом. */
   scrim: "rgba(0, 0, 0, 0.28)",
+  /** Полоска-индикатор для свайпа сверху шита. */
+  handle: "rgba(0, 0, 0, 0.12)",
+  /** Подсветка нажатой клавиши цифровой клавиатуры. */
+  pressedOverlay: "rgba(0, 0, 0, 0.06)",
 
   // ── Текст ──
   /** Обычный текст и заголовки. */
@@ -123,6 +127,8 @@ export const radius = {
   cardLarge: 24,
   /** Верх модального шита. */
   sheet: 28,
+  /** Клавиша цифровой клавиатуры. */
+  key: 14,
   /** Пилюли, кнопки, круглые элементы. */
   pill: 999,
 } as const;
@@ -154,6 +160,15 @@ export const typography = {
     lineHeight: 51,
     fontWeight: "700",
     letterSpacing: -1.4,
+    ...tabularNums,
+  },
+  /** Сумма в шите добавления: 50/700/-1.5. */
+  amountSheet: {
+    fontFamily,
+    fontSize: 50,
+    lineHeight: 58,
+    fontWeight: "700",
+    letterSpacing: -1.5,
     ...tabularNums,
   },
   /** Крупная сумма на экране деталей: 36/700/-1. */
@@ -257,6 +272,14 @@ export const typography = {
     fontSize: 10.5,
     lineHeight: 14,
     fontWeight: "600",
+  },
+  /** Клавиша цифровой клавиатуры: 24/500. */
+  key: {
+    fontFamily,
+    fontSize: 24,
+    lineHeight: 30,
+    fontWeight: "500",
+    ...tabularNums,
   },
   /** Текст кнопки: 16/600. */
   button: {

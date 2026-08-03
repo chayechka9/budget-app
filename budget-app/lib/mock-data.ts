@@ -82,10 +82,11 @@ export const MOCK_TRANSACTIONS: MockTransaction[] = [
   { id: "t-10", payee: "Luas", category: "Transport", icon: "transport", amount: -2.6, date: "2026-07-27" },
 ];
 
-/** Плоский список названий категорий — для селектора в модалке добавления. */
-export const MOCK_CATEGORY_NAMES: string[] = MOCK_GROUPS.flatMap((group) =>
-  group.categories.map((category) => category.name),
-);
+/** Плоский список категорий с иконками — для селектора в шите добавления. */
+export const MOCK_CATEGORY_OPTIONS: { name: string; icon: IconName }[] =
+  MOCK_GROUPS.flatMap((group) =>
+    group.categories.map((category) => ({ name: category.name, icon: category.icon })),
+  );
 
 /** Текущий период — используется как оверлайн на Home. */
 export const MOCK_MONTH_LABEL = "August";

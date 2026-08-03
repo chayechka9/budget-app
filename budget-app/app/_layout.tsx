@@ -5,7 +5,6 @@ import Head from "expo-router/head";
 import { StatusBar } from "expo-status-bar";
 
 import { navigationScreenOptions } from "../components/TabBar";
-import { colors } from "../constants/theme";
 
 export default function RootLayout() {
   return (
@@ -30,10 +29,11 @@ export default function RootLayout() {
         <Stack.Screen
           name="add-transaction"
           options={{
-            presentation: "modal",
-            title: "New transaction",
-            // Хедер в цвет шита, иначе на стыке видна полоса другого оттенка.
-            headerStyle: { backgroundColor: colors.surfaceSheet },
+            // Bottom sheet: экран под ним остаётся видимым и затемняется.
+            // Шапку рисует сам шит — своя полоска-индикатор и крестик.
+            presentation: "transparentModal",
+            animation: "fade",
+            headerShown: false,
           }}
         />
       </Stack>

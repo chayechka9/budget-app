@@ -18,6 +18,9 @@ export const ICONS = {
   progress: "stats-chart-outline",
   settings: "options-outline",
   chevronRight: "chevron-forward-outline",
+  close: "close-outline",
+  calendar: "calendar-outline",
+  backspace: "backspace-outline",
 
   // Категории и транзакции
   rent: "key-outline",
