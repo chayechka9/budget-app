@@ -5,19 +5,15 @@ import { CategoryCard } from "../../components/CategoryCard";
 import { ProgressRing } from "../../components/Progress";
 import { ReadyToAssignPill } from "../../components/ReadyToAssignPill";
 import { colors, spacing, typography } from "../../constants/theme";
-import {
-  MOCK_GROUPS,
-  MOCK_SUMMARY,
-  type MockCategory,
-  formatMoney,
-} from "../../lib/mock-data";
+import { MOCK_GROUPS, type MockCategory, formatMoney } from "../../lib/mock-data";
+import { useStore } from "../../lib/store";
 
 /**
  * Fixed-категория: слева потрачено из плана, справа остаток. Перерасход
  * помечается только точкой — полоса и сумма остаются нейтральными.
  */
-function FixedRow({ category }: { category: MockCategory }) {
-  const spent = category.spent ?? 0;
+function FixedRow({ category, extraSpent }: { category: MockCategory; extraSpent: number }) {
+  const spent = (category.spent ?? 0) + extraSpent;
   const remaining = category.assigned - spent;
   const overspent = remaining < 0;
 
@@ -54,13 +50,15 @@ function SavingsRow({ category }: { category: MockCategory }) {
 }
 
 export default function BudgetScreen() {
+  const { readyToAssign, extraSpentByCategory } = useStore();
+
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: colors.background }}
       contentContainerStyle={{ paddingBottom: spacing.xxxl }}
     >
       <View style={{ paddingHorizontal: spacing.xl, paddingTop: spacing.lg }}>
-        <ReadyToAssignPill amount={formatMoney(MOCK_SUMMARY.readyToAssign)} />
+        <ReadyToAssignPill amount={formatMoney(readyToAssign)} />
       </View>
 
       {MOCK_GROUPS.map((group) => (
@@ -79,7 +77,10 @@ export default function BudgetScreen() {
                 {category.kind === "savings" ? (
                   <SavingsRow category={category} />
                 ) : (
-                  <FixedRow category={category} />
+                  <FixedRow
+                    category={category}
+                    extraSpent={extraSpentByCategory[category.name] ?? 0}
+                  />
                 )}
               </CardRow>
             ))}

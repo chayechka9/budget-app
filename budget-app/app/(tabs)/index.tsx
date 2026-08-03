@@ -6,18 +6,15 @@ import { IconTile } from "../../components/IconTile";
 import { ReadyToAssignPill } from "../../components/ReadyToAssignPill";
 import { TransactionRow } from "../../components/TransactionRow";
 import { colors, spacing, typography } from "../../constants/theme";
-import {
-  MOCK_MONTH_LABEL,
-  MOCK_SUMMARY,
-  MOCK_TRANSACTIONS,
-  formatMoney,
-} from "../../lib/mock-data";
+import { MOCK_MONTH_LABEL, formatMoney } from "../../lib/mock-data";
+import { useStore } from "../../lib/store";
 
 const RECENT_COUNT = 3;
 
 export default function HomeScreen() {
   const router = useRouter();
-  const recent = MOCK_TRANSACTIONS.slice(0, RECENT_COUNT);
+  const { transactions, totalBalance, readyToAssign, savedThisMonth } = useStore();
+  const recent = transactions.slice(0, RECENT_COUNT);
 
   return (
     <ScrollView
@@ -32,13 +29,13 @@ export default function HomeScreen() {
         Total balance
       </Text>
       <Text style={[typography.hero, { color: colors.text, marginTop: 2 }]}>
-        {formatMoney(MOCK_SUMMARY.totalBalance)}
+        {formatMoney(totalBalance)}
       </Text>
 
       {/* Ready to Assign — мягкая подсказка, не блокирует */}
       <View style={{ marginTop: spacing.lg }}>
         <ReadyToAssignPill
-          amount={formatMoney(MOCK_SUMMARY.readyToAssign)}
+          amount={formatMoney(readyToAssign)}
           onPress={() => router.push("/budget")}
         />
       </View>
@@ -52,7 +49,7 @@ export default function HomeScreen() {
             <Text
               style={[typography.amount, { color: colors.positiveText, marginTop: spacing.xs }]}
             >
-              {formatMoney(MOCK_SUMMARY.savedThisMonth)}
+              {formatMoney(savedThisMonth)}
             </Text>
           </View>
         </View>

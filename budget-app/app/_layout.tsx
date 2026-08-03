@@ -5,10 +5,11 @@ import Head from "expo-router/head";
 import { StatusBar } from "expo-status-bar";
 
 import { navigationScreenOptions } from "../components/TabBar";
+import { StoreProvider } from "../lib/store";
 
 export default function RootLayout() {
   return (
-    <>
+    <StoreProvider>
       {/* Заголовок вкладки браузера. На нативе Head — no-op. */}
       <Head>
         <title>Budget App</title>
@@ -37,6 +38,6 @@ export default function RootLayout() {
           }}
         />
       </Stack>
-    </>
+    </StoreProvider>
   );
 }

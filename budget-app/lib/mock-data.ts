@@ -88,6 +88,14 @@ export const MOCK_CATEGORY_OPTIONS: { name: string; icon: IconName }[] =
     group.categories.map((category) => ({ name: category.name, icon: category.icon })),
   );
 
+/** Источники дохода — для режима Income в шите добавления. */
+export const MOCK_INCOME_SOURCES: { name: string; icon: IconName }[] = [
+  { name: "Salary", icon: "income" },
+  { name: "Freelance", icon: "laptop" },
+  { name: "Gift", icon: "wallet" },
+  { name: "Other", icon: "wallet" },
+];
+
 /** Текущий период — используется как оверлайн на Home. */
 export const MOCK_MONTH_LABEL = "August";
 
