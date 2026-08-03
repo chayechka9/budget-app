@@ -1,9 +1,9 @@
 # Expo HAS CHANGED
 
-Read the exact versioned docs at https://docs.expo.dev/versions/v54.0.0/ before writing any code.
+Read the exact versioned docs at https://docs.expo.dev/versions/v57.0.0/ before writing any code.
 
-This project is pinned to **SDK 54**, not the latest SDK. Do not upgrade it without being asked.
+This project is on **SDK 57** — the latest stable release. Do not change the SDK version
+without being asked.
 
-**Это временный откат.** Проект жил на SDK 56; понижен до 54, потому что Expo Go на тестовом
-телефоне поддерживает только SDK 54 и обновиться не может. Вернём на актуальный SDK, когда
-появится dev build или обновлённый Expo Go.
+Историческая справка: проект временно понижали до SDK 54 ради Expo Go на тестовом телефоне.
+Откат отменён, вернулись на актуальные версии.
