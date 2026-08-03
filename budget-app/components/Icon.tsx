@@ -1,4 +1,5 @@
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons, Octicons } from "@expo/vector-icons";
+import type { ComponentProps } from "react";
 import type { ColorValue } from "react-native";
 
 import { colors, iconSize } from "../constants/theme";
@@ -6,35 +7,49 @@ import { colors, iconSize } from "../constants/theme";
 /**
  * Единственный набор иконок в приложении.
  *
- * Только outline-варианты Ionicons: одинаковая толщина линии, без заливок —
- * в духе SF Symbols и line-иконок макета. Новые иконки добавлять сюда,
- * а не звать Ionicons напрямую, иначе стили начнут смешиваться.
+ * Базовый набор — outline-варианты Ionicons. Несколько иконок взяты из
+ * Octicons и MaterialCommunityIcons: в Ionicons нет вариантов с нужным числом
+ * элементов (домик без двери, 3 столбика, 2 линии-слайдера). Толщина линий и
+ * скругления у этих трёх наборов совпадают, стиль не выбивается.
+ *
+ * Новые иконки добавлять сюда, а не звать наборы напрямую.
  */
+type IconSpec =
+  | { set: "ionicons"; name: ComponentProps<typeof Ionicons>["name"]; scale?: number }
+  | { set: "octicons"; name: ComponentProps<typeof Octicons>["name"]; scale?: number }
+  | {
+      set: "material";
+      name: ComponentProps<typeof MaterialCommunityIcons>["name"];
+      scale?: number;
+    };
+
+/** Глифы разных наборов рисуются с разным полем внутри кегля — выравниваем. */
 export const ICONS = {
   // Навигация
-  home: "home-outline",
-  budget: "grid-outline",
-  add: "add-outline",
-  progress: "stats-chart-outline",
-  settings: "options-outline",
-  chevronRight: "chevron-forward-outline",
-  close: "close-outline",
-  calendar: "calendar-outline",
-  backspace: "backspace-outline",
+  home: { set: "octicons", name: "home", scale: 0.92 },
+  budget: { set: "material", name: "view-grid-outline", scale: 1.04 },
+  add: { set: "ionicons", name: "add-outline" },
+  progress: { set: "material", name: "chart-bar", scale: 1.04 },
+  settings: { set: "material", name: "tune-variant", scale: 1.04 },
+
+  chevronRight: { set: "ionicons", name: "chevron-forward-outline" },
+  close: { set: "ionicons", name: "close-outline" },
+  calendar: { set: "ionicons", name: "calendar-outline" },
+  backspace: { set: "ionicons", name: "backspace-outline" },
 
   // Категории и транзакции
-  rent: "key-outline",
-  groceries: "cart-outline",
-  utilities: "flash-outline",
-  transport: "bus-outline",
-  eatingOut: "restaurant-outline",
-  subscriptions: "musical-notes-outline",
-  emergency: "shield-outline",
-  trip: "airplane-outline",
-  laptop: "laptop-outline",
-  income: "arrow-down-outline",
-  wallet: "wallet-outline",
-} as const satisfies Record<string, React.ComponentProps<typeof Ionicons>["name"]>;
+  rent: { set: "ionicons", name: "key-outline" },
+  groceries: { set: "ionicons", name: "cart-outline" },
+  utilities: { set: "ionicons", name: "flash-outline" },
+  transport: { set: "ionicons", name: "bus-outline" },
+  eatingOut: { set: "ionicons", name: "restaurant-outline" },
+  subscriptions: { set: "ionicons", name: "musical-notes-outline" },
+  emergency: { set: "ionicons", name: "shield-outline" },
+  trip: { set: "ionicons", name: "airplane-outline" },
+  laptop: { set: "ionicons", name: "laptop-outline" },
+  income: { set: "ionicons", name: "arrow-down-outline" },
+  wallet: { set: "ionicons", name: "wallet-outline" },
+} as const satisfies Record<string, IconSpec>;
 
 export type IconName = keyof typeof ICONS;
 
@@ -45,5 +60,14 @@ type IconProps = {
 };
 
 export function Icon({ name, size = iconSize.md, color = colors.text }: IconProps) {
-  return <Ionicons name={ICONS[name]} size={size} color={color} />;
+  const spec: IconSpec = ICONS[name];
+  const resolved = Math.round(size * (spec.scale ?? 1));
+
+  if (spec.set === "octicons") {
+    return <Octicons name={spec.name} size={resolved} color={color} />;
+  }
+  if (spec.set === "material") {
+    return <MaterialCommunityIcons name={spec.name} size={resolved} color={color} />;
+  }
+  return <Ionicons name={spec.name} size={resolved} color={color} />;
 }

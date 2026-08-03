@@ -30,8 +30,8 @@ export const navigationScreenOptions = {
   headerShadowVisible: false,
 } as const;
 
-/** Кнопка [+] в макете — 54px. */
-const BUTTON_SIZE = 54;
+/** Кнопка [+] помещается внутрь панели целиком, поэтому меньше высоты строки. */
+const BUTTON_SIZE = 44;
 
 /**
  * Приподнятая центральная кнопка [+]. Это действие, а не вкладка — onPress
@@ -49,8 +49,9 @@ export function TabBarAddButton({ onPress }: { onPress: () => void }) {
         onPress={onPress}
         style={[
           {
+            // absolute, чтобы кнопка не растягивала высоту строки таб-бара
+            // и не обрезала подписи. Без top/bottom центрируется по строке.
             position: "absolute",
-            top: -BUTTON_SIZE / 3,
             height: BUTTON_SIZE,
             width: BUTTON_SIZE,
             alignItems: "center",
@@ -58,7 +59,7 @@ export function TabBarAddButton({ onPress }: { onPress: () => void }) {
             borderRadius: radius.pill,
             backgroundColor: colors.surfaceInverse,
           },
-          shadows.fab,
+          shadows.pill,
         ]}
       >
         <Icon name="add" size={iconSize.lg} color={colors.textInverse} />
