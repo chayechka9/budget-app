@@ -17,13 +17,17 @@
 
 ### Важно: репозиторий на уровень выше
 
-Git-репозиторий находится в родительской папке `budgeting app/`, а не здесь.
-`git add .` из `budget-app/` заберёт только эту подпапку и пропустит остальное
+Git-репозиторий находится в родительской папке `~/Developer/budget-app/`, а не здесь.
+`git add .` из вложенной `budget-app/` заберёт только эту подпапку и пропустит остальное
 (например `budget app plan/`). Поэтому команды выполнять из корня репозитория:
 
 ```bash
-cd "/Users/illiachaikin/Documents/budgeting app" && git add . && git commit -m "…" && git push
+cd ~/Developer/budget-app && git add . && git commit -m "…" && git push
 ```
+
+Проект намеренно живёт вне `~/Documents`: та папка синхронизируется в iCloud, который
+плодит дубликаты внутри `node_modules` (`metro 2`, `@expo 2`) и ломает Metro. Не
+возвращать проект в iCloud-синхронизируемые папки.
 
 Ветка `main`, remote `origin` → https://github.com/chayechka9/budget-app.git
 Identity задана локально в репозитории; глобальный git-конфиг не трогать.
