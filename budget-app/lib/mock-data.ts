@@ -99,6 +99,15 @@ export const MOCK_INCOME_SOURCES: { name: string; icon: IconName }[] = [
 /** Текущий период — используется как оверлайн на Home. */
 export const MOCK_MONTH_LABEL = "August";
 
+/**
+ * Итог прошлого месяца — карточка «July wrapped up» на Home.
+ * Настоящий расчёт появится вместе с месячными срезами на Stage 1.
+ */
+export const MOCK_LAST_MONTH = {
+  label: "July",
+  leftUnspent: 113.4,
+};
+
 export const MOCK_SUMMARY = {
   /** Всего денег на счетах. */
   totalBalance: 8420.35,

@@ -1,8 +1,11 @@
 import { Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { colors, spacing, typography } from "../../constants/theme";
 
 export default function ProgressScreen() {
+  const insets = useSafeAreaInsets();
+
   return (
     <View
       style={{
@@ -11,6 +14,7 @@ export default function ProgressScreen() {
         justifyContent: "center",
         backgroundColor: colors.background,
         paddingHorizontal: spacing.xl,
+        paddingTop: insets.top,
       }}
     >
       <Text style={[typography.screenTitle, { color: colors.text }]}>Progress</Text>

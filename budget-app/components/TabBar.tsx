@@ -1,6 +1,14 @@
-import { HAIRLINE, colors, iconSize, radius, shadows, typography } from "../constants/theme";
 import { Platform, Pressable, View } from "react-native";
 
+import {
+  HAIRLINE,
+  colors,
+  iconSize,
+  radius,
+  shadows,
+  tabBar,
+  typography,
+} from "../constants/theme";
 import { Icon } from "./Icon";
 
 /**
@@ -8,34 +16,36 @@ import { Icon } from "./Icon";
  * навигация ещё будет меняться, и переписывать react-navigation целиком
  * ради оформления смысла нет.
  *
- * В макете панель полупрозрачная с backdrop-blur. Блюра здесь нет намеренно:
- * он требует expo-blur и абсолютного позиционирования панели, то есть правок
- * лейаута всех экранов. Цвет взят тот же, что в экспорте.
+ * Геометрия панели взята из макета: 94px высоты, отступы 10/30, иконка 23px,
+ * подпись 10.5px, зазор 3px. Хедеры экранов скрыты — в макете их нет, контент
+ * начинается сразу с оверлайна месяца.
+ *
+ * Полупрозрачность есть, блюра нет намеренно: backdrop-filter из макета
+ * требует expo-blur и абсолютного позиционирования панели, то есть правок
+ * лейаута всех экранов.
  */
 export const navigationScreenOptions = {
+  headerShown: false,
   tabBarActiveTintColor: colors.text,
   tabBarInactiveTintColor: colors.textMuted,
-  tabBarLabelStyle: typography.tabLabel,
+  tabBarLabelStyle: { ...typography.tabLabel, marginTop: tabBar.labelGap },
   tabBarStyle: {
     backgroundColor: colors.backgroundTranslucent,
     borderTopColor: colors.separator,
     borderTopWidth: HAIRLINE,
-    // Только для веба: там нет safe-area снизу, и подписи из темы обрезаются.
-    // На нативе высоту не трогаем — даже height: undefined ломает расчёт.
-    ...(Platform.OS === "web" ? { height: 68 } : null),
+    height: tabBar.height,
+    paddingTop: tabBar.paddingTop,
+    paddingBottom: tabBar.paddingBottom,
+    paddingHorizontal: tabBar.paddingHorizontal,
+    // На вебе safe-area снизу нет, поэтому 30px запаса там лишние.
+    ...(Platform.OS === "web"
+      ? { height: tabBar.height - tabBar.paddingBottom + 12, paddingBottom: 12 }
+      : null),
   },
-  headerStyle: { backgroundColor: colors.background },
-  headerTitleStyle: typography.headline,
-  headerTintColor: colors.text,
-  headerShadowVisible: false,
 } as const;
 
-/** Кнопка [+] помещается внутрь панели целиком, поэтому меньше высоты строки. */
-const BUTTON_SIZE = 44;
-
 /**
- * Приподнятая центральная кнопка [+]. Это действие, а не вкладка — onPress
- * задаёт вызывающая сторона.
+ * Центральная кнопка [+] — 54px, как в макете, целиком внутри панели.
  *
  * Позиционируется абсолютно: иначе кнопка растягивает высоту строки таб-бара
  * и подписи остальных вкладок обрезаются.
@@ -49,17 +59,15 @@ export function TabBarAddButton({ onPress }: { onPress: () => void }) {
         onPress={onPress}
         style={[
           {
-            // absolute, чтобы кнопка не растягивала высоту строки таб-бара
-            // и не обрезала подписи. Без top/bottom центрируется по строке.
             position: "absolute",
-            height: BUTTON_SIZE,
-            width: BUTTON_SIZE,
+            height: tabBar.addButtonSize,
+            width: tabBar.addButtonSize,
             alignItems: "center",
             justifyContent: "center",
             borderRadius: radius.pill,
             backgroundColor: colors.surfaceInverse,
           },
-          shadows.pill,
+          shadows.fab,
         ]}
       >
         <Icon name="add" size={iconSize.lg} color={colors.textInverse} />

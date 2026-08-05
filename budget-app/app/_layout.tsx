@@ -4,7 +4,6 @@ import { Stack } from "expo-router";
 import Head from "expo-router/head";
 import { StatusBar } from "expo-status-bar";
 
-import { navigationScreenOptions } from "../components/TabBar";
 import { StoreProvider } from "../lib/store";
 
 export default function RootLayout() {
@@ -15,18 +14,11 @@ export default function RootLayout() {
         <title>Budget App</title>
       </Head>
       <StatusBar style="dark" />
-      <Stack
-        screenOptions={{
-          headerStyle: navigationScreenOptions.headerStyle,
-          headerTitleStyle: navigationScreenOptions.headerTitleStyle,
-          headerTintColor: navigationScreenOptions.headerTintColor,
-          headerShadowVisible: false,
-        }}
-      >
-        {/* title нужен даже при скрытом хедере: iOS берёт его как подпись
-            кнопки «назад» на push-экранах, иначе там оказывается «(tabs)». */}
-        <Stack.Screen name="(tabs)" options={{ headerShown: false, title: "Home" }} />
-        <Stack.Screen name="transactions" options={{ title: "All transactions" }} />
+      {/* Текстовых хедеров в макете нет ни на одном экране: контент начинается
+          сразу, а «назад» на push-экране рисуется круглой кнопкой внутри него. */}
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="transactions" />
         <Stack.Screen
           name="add-transaction"
           options={{
@@ -34,7 +26,6 @@ export default function RootLayout() {
             // Шапку рисует сам шит — своя полоска-индикатор и крестик.
             presentation: "transparentModal",
             animation: "fade",
-            headerShown: false,
           }}
         />
       </Stack>

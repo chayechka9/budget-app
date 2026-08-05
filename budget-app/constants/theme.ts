@@ -64,6 +64,8 @@ export const colors = {
   textFaint: "rgba(0, 0, 0, 0.25)",
   /** Иконки внутри круглых кнопок. */
   icon: "rgba(0, 0, 0, 0.6)",
+  /** Иконки категорий в плашках строк — в макете чуть контрастнее. */
+  iconStrong: "rgba(0, 0, 0, 0.72)",
   /** Текст на тёмном. */
   textInverse: "#FFFFFF",
 
@@ -117,10 +119,12 @@ export const spacing = {
 
 /** Скругления из макета. */
 export const radius = {
-  /** Плашка под иконкой строки (34–38px). */
+  /** Плашка 34px в строке Recent. */
+  tileSmall: 11,
+  /** Плашка под иконкой строки (36–38px). */
   tile: 12,
-  /** Плашка под крупной иконкой (42–52px). */
-  tileLarge: 16,
+  /** Плашка 42px в карточке итогов месяца. */
+  tileLarge: 14,
   /** Карточка-список. */
   card: 22,
   /** Карточка с содержимым. */
@@ -241,10 +245,10 @@ export const typography = {
     lineHeight: 17,
     fontWeight: "400",
   },
-  /** Мелкая подпись строки: 12.5/400. */
+  /** Мелкая подпись строки Recent: 12/400. */
   captionSmall: {
     fontFamily,
-    fontSize: 12.5,
+    fontSize: 12,
     lineHeight: 16,
     fontWeight: "400",
   },
@@ -300,6 +304,25 @@ export const iconSize = {
   md: 23,
   /** Плюс в кнопке [+]. */
   lg: 22,
+  /** Шеврон в карточке (8×14 в макете). */
+  chevron: 15,
+} as const;
+
+/**
+ * Геометрия таб-бара из макета: padding 10px сверху, 30px снизу, кнопка [+]
+ * 54px, итого 94px высоты. Иконка 23px, подпись 10.5px, зазор 3px.
+ */
+export const tabBar = {
+  height: 94,
+  paddingTop: 10,
+  paddingBottom: 30,
+  paddingHorizontal: 16,
+  /** Ширина колонки вкладки. */
+  itemWidth: 60,
+  /** Зазор между иконкой и подписью. */
+  labelGap: 3,
+  /** Диаметр центральной кнопки. */
+  addButtonSize: 54,
 } as const;
 
 /** Высота полос прогресса. */

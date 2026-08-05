@@ -10,16 +10,22 @@ type IconTileProps = {
   tone?: "neutral" | "positive";
 };
 
-/** Скруглённая плашка под иконкой строки — базовый элемент списков макета. */
+/**
+ * Скруглённая плашка под иконкой строки — базовый элемент списков макета.
+ * Радиус зависит от размера: 34px → 11, 36–38px → 12, 42px → 14.
+ */
 export function IconTile({ name, size = 38, tone = "neutral" }: IconTileProps) {
   const positive = tone === "positive";
+  const tileRadius =
+    size >= 42 ? radius.tileLarge : size <= 34 ? radius.tileSmall : radius.tile;
+  const glyphSize = size >= 42 ? 20 : iconSize.sm;
 
   return (
     <View
       style={{
         width: size,
         height: size,
-        borderRadius: size >= 42 ? radius.tileLarge : radius.tile,
+        borderRadius: tileRadius,
         backgroundColor: positive ? colors.positiveSurface : colors.surfaceTile,
         alignItems: "center",
         justifyContent: "center",
@@ -27,8 +33,8 @@ export function IconTile({ name, size = 38, tone = "neutral" }: IconTileProps) {
     >
       <Icon
         name={name}
-        size={iconSize.sm}
-        color={positive ? colors.positive : colors.icon}
+        size={glyphSize}
+        color={positive ? colors.positive : colors.iconStrong}
       />
     </View>
   );

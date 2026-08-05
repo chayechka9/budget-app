@@ -1,4 +1,5 @@
 import { ScrollView, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Card, CardRow } from "../../components/Card";
 import { CategoryCard } from "../../components/CategoryCard";
@@ -50,14 +51,15 @@ function SavingsRow({ category }: { category: MockCategory }) {
 }
 
 export default function BudgetScreen() {
+  const insets = useSafeAreaInsets();
   const { readyToAssign, extraSpentByCategory } = useStore();
 
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: colors.background }}
-      contentContainerStyle={{ paddingBottom: spacing.xxxl }}
+      contentContainerStyle={{ paddingTop: insets.top + 19, paddingBottom: spacing.xxxl }}
     >
-      <View style={{ paddingHorizontal: spacing.xl, paddingTop: spacing.lg }}>
+      <View style={{ paddingHorizontal: spacing.xl, flexDirection: "row" }}>
         <ReadyToAssignPill amount={formatMoney(readyToAssign)} />
       </View>
 
