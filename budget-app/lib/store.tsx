@@ -1,10 +1,19 @@
-import { createContext, useContext, useMemo, useState, type PropsWithChildren } from "react";
+import {
+  createContext,
+  useContext,
+  useMemo,
+  useState,
+  type Dispatch,
+  type PropsWithChildren,
+  type SetStateAction,
+} from "react";
 
 import type { IconName } from "../components/Icon";
 import {
   MOCK_GROUPS,
   MOCK_SUMMARY,
   MOCK_TRANSACTIONS,
+  type CategoryKind,
   type MockCategory,
   type MockTransaction,
 } from "./mock-data";
@@ -32,12 +41,64 @@ export interface NewTransaction {
 }
 
 /**
+ * Заполненная форма категории — одна и та же для создания и редактирования.
+ */
+export interface CategoryDraft {
+  name: string;
+  kind: CategoryKind;
+  icon: IconName;
+  /** План на месяц у fixed, цель накопления у savings. */
+  amount: number;
+  /** Существующая группа. */
+  groupId: string;
+  /** Непустое имя — создать группу с этим названием и положить категорию в неё. */
+  newGroupName?: string;
+}
+
+/** Название группы в id: «Fun money» → «fun-money». */
+function slugify(value: string): string {
+  return (
+    value
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "") || "group"
+  );
+}
+
+/**
+ * Группа, в которую ляжет категория. Для «New group» её id выводится из
+ * названия, а сама группа заодно добавляется в список — так создание группы
+ * и категории остаётся одним действием пользователя.
+ */
+function resolveGroupId(
+  draft: CategoryDraft,
+  setExtraGroups: Dispatch<SetStateAction<{ id: string; name: string }[]>>,
+): string {
+  const newGroupName = draft.newGroupName?.trim();
+  if (!newGroupName) return draft.groupId;
+
+  const id = `g-new-${slugify(newGroupName)}`;
+  setExtraGroups((current) =>
+    current.some((group) => group.id === id)
+      ? current
+      : [...current, { id, name: newGroupName }],
+  );
+  return id;
+}
+
+/**
  * Категория с уже применёнными правками сессии. Экраны берут только её и не
  * складывают моки с дельтами у себя — иначе Home и Budget разъезжаются.
  */
 export interface ResolvedCategory extends MockCategory {
   groupId: string;
   groupName: string;
+  /**
+   * Названия, под которыми на категорию ссылаются транзакции: текущее и, если
+   * категорию переименовали, прежнее. Экраны фильтруют историю по этому списку,
+   * а не по `name`, иначе переименование прячет все прошлые траты.
+   */
+  matchNames: string[];
 }
 
 export interface ResolvedGroup {
@@ -45,6 +106,12 @@ export interface ResolvedGroup {
   name: string;
   categories: ResolvedCategory[];
 }
+
+/** Категория вместе с группой, в которой она лежит. */
+type PlacedCategory = MockCategory & { groupId: string };
+
+/** Она же с уже вычисленными именами для сопоставления с транзакциями. */
+type NamedCategory = PlacedCategory & { matchNames: string[] };
 
 interface Store {
   transactions: MockTransaction[];
@@ -57,6 +124,8 @@ interface Store {
   addTransaction: (input: NewTransaction) => void;
   /** Разложить деньги из Ready to assign по категориям: id категории → сумма. */
   assign: (amountByCategoryId: Record<string, number>) => void;
+  addCategory: (draft: CategoryDraft) => void;
+  updateCategory: (id: string, draft: CategoryDraft) => void;
 }
 
 const StoreContext = createContext<Store | null>(null);
@@ -64,6 +133,12 @@ const StoreContext = createContext<Store | null>(null);
 export function StoreProvider({ children }: PropsWithChildren) {
   const [added, setAdded] = useState<MockTransaction[]>([]);
   const [assignedByCategory, setAssignedByCategory] = useState<Record<string, number>>({});
+  /** Группы, созданные через «New group» в форме категории. */
+  const [extraGroups, setExtraGroups] = useState<{ id: string; name: string }[]>([]);
+  /** Категории, созданные в этой сессии. */
+  const [extraCategories, setExtraCategories] = useState<PlacedCategory[]>([]);
+  /** Правки существующих категорий: id → изменённые поля. */
+  const [edits, setEdits] = useState<Record<string, Partial<PlacedCategory>>>({});
 
   const value = useMemo<Store>(() => {
     // Расход уменьшает баланс, доход увеличивает.
@@ -87,21 +162,48 @@ export function StoreProvider({ children }: PropsWithChildren) {
       0,
     );
 
-    const groups: ResolvedGroup[] = MOCK_GROUPS.map((group) => ({
+    // Правки накладываются до раскладки по группам: смена группы — это тоже
+    // правка, и категория должна уехать в новую группу, а не остаться в старой.
+    const placed: NamedCategory[] = [
+      ...MOCK_GROUPS.flatMap((group) =>
+        group.categories.map((category) => ({ ...category, groupId: group.id })),
+      ),
+      ...extraCategories,
+    ].map((category) => {
+      const edited = { ...category, ...edits[category.id] };
+      // Транзакция ссылается на категорию по названию, а Edit его меняет.
+      // Старые траты записаны с прежним именем, новые — с текущим, поэтому
+      // категории принадлежат оба.
+      return {
+        ...edited,
+        matchNames:
+          edited.name === category.name ? [category.name] : [category.name, edited.name],
+      };
+    });
+
+    const groups: ResolvedGroup[] = [
+      ...MOCK_GROUPS.map(({ id, name }) => ({ id, name })),
+      ...extraGroups,
+    ].map((group) => ({
       id: group.id,
       name: group.name,
-      categories: group.categories.map((category) => ({
-        ...category,
-        groupId: group.id,
-        groupName: group.name,
-        // У fixed это план на месяц, у savings — уже накопленное. Assign
-        // пополняет и то, и другое.
-        assigned: category.assigned + (assignedByCategory[category.id] ?? 0),
-        spent:
-          category.kind === "fixed"
-            ? (category.spent ?? 0) + (extraSpentByCategory[category.name] ?? 0)
-            : category.spent,
-      })),
+      categories: placed
+        .filter((category) => category.groupId === group.id)
+        .map((category) => ({
+          ...category,
+          groupName: group.name,
+          // У fixed это план на месяц, у savings — уже накопленное. Assign
+          // пополняет и то, и другое.
+          assigned: category.assigned + (assignedByCategory[category.id] ?? 0),
+          spent:
+            category.kind === "fixed"
+              ? (category.spent ?? 0) +
+                category.matchNames.reduce(
+                  (sum, name) => sum + (extraSpentByCategory[name] ?? 0),
+                  0,
+                )
+              : category.spent,
+        })),
     }));
 
     return {
@@ -137,8 +239,50 @@ export function StoreProvider({ children }: PropsWithChildren) {
           return next;
         });
       },
+      addCategory: (draft) => {
+        const groupId = resolveGroupId(draft, setExtraGroups);
+        setExtraCategories((current) => [
+          ...current,
+          {
+            id: `c-new-${slugify(draft.name)}-${current.length + 1}`,
+            groupId,
+            name: draft.name.trim(),
+            kind: draft.kind,
+            icon: draft.icon,
+            // У fixed сумма из формы — план на месяц; у savings это цель, а
+            // накоплено пока ноль.
+            assigned: draft.kind === "fixed" ? draft.amount : 0,
+            spent: draft.kind === "fixed" ? 0 : undefined,
+            target: draft.kind === "savings" ? draft.amount : undefined,
+          },
+        ]);
+      },
+      updateCategory: (id, draft) => {
+        const groupId = resolveGroupId(draft, setExtraGroups);
+        setEdits((current) => ({
+          ...current,
+          [id]: {
+            ...current[id],
+            groupId,
+            name: draft.name.trim(),
+            kind: draft.kind,
+            icon: draft.icon,
+            ...(draft.kind === "fixed"
+              ? // Сумма из формы — это уже итоговый план вместе с разложенным
+                // на категорию. Хранить её как есть нельзя: раскладка
+                // прибавится к ней второй раз. Обнулять раскладку тоже нельзя —
+                // тогда те же деньги вернутся в Ready to assign и появятся
+                // дважды. Поэтому храним план за вычетом раскладки.
+                {
+                  assigned: draft.amount - (assignedByCategory[id] ?? 0),
+                  target: undefined,
+                }
+              : { target: draft.amount }),
+          },
+        }));
+      },
     };
-  }, [added, assignedByCategory]);
+  }, [added, assignedByCategory, extraGroups, extraCategories, edits]);
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
 }

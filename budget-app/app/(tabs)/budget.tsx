@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Card, CardRow } from "../../components/Card";
 import { CategoryCard } from "../../components/CategoryCard";
+import { CircleButton } from "../../components/CircleButton";
 import { ProgressRing, spendProgress } from "../../components/Progress";
 import { ReadyToAssignPill } from "../../components/ReadyToAssignPill";
 import { colors, spacing, typography } from "../../constants/theme";
@@ -62,10 +63,24 @@ export default function BudgetScreen() {
       style={{ flex: 1, backgroundColor: colors.background }}
       contentContainerStyle={{ paddingTop: insets.top + 19, paddingBottom: spacing.xxxl }}
     >
-      <View style={{ paddingHorizontal: spacing.xl, flexDirection: "row" }}>
+      <View
+        style={{
+          paddingHorizontal: spacing.xl,
+          flexDirection: "row",
+          alignItems: "center",
+          gap: spacing.md,
+        }}
+      >
         <ReadyToAssignPill
           amount={formatMoney(readyToAssign)}
           onPress={() => router.push("/assign")}
+        />
+        <View style={{ flex: 1 }} />
+        <CircleButton
+          icon="add"
+          label="New category"
+          glyphSize={17}
+          onPress={() => router.push("/category-form")}
         />
       </View>
 

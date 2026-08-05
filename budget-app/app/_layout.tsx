@@ -38,6 +38,7 @@ export default function RootLayout() {
         <Stack.Screen name="spending" options={MODAL} />
         <Stack.Screen name="wrapped-up" options={MODAL} />
         <Stack.Screen name="category/[id]" options={MODAL} />
+        <Stack.Screen name="category-form" options={MODAL} />
         <Stack.Screen name="transaction/[id]" options={MODAL} />
       </Stack>
     </StoreProvider>

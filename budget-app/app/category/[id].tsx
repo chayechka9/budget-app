@@ -1,6 +1,7 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Text, View } from "react-native";
 
+import { Button } from "../../components/Button";
 import { Card, CardRow } from "../../components/Card";
 import { Icon } from "../../components/Icon";
 import { ModalScreen } from "../../components/ModalScreen";
@@ -138,7 +139,7 @@ export default function CategoryDetailScreen() {
   // Транзакции связаны с категорией по названию — id у них появится вместе
   // с настоящим хранилищем.
   const history = transactions
-    .filter((transaction) => transaction.category === category.name)
+    .filter((transaction) => category.matchNames.includes(transaction.category))
     .slice()
     .sort((a, b) => b.date.localeCompare(a.date));
 
@@ -176,6 +177,14 @@ export default function CategoryDetailScreen() {
             {category.groupName}
           </Text>
         </View>
+
+        <Button
+          label="Edit"
+          variant="secondary"
+          block={false}
+          onPress={() => router.push(`/category-form?id=${category.id}`)}
+          style={{ height: 38, paddingHorizontal: spacing.lg }}
+        />
       </View>
 
       {category.kind === "savings" ? (

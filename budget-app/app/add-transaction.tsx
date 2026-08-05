@@ -8,7 +8,7 @@ import { Icon, type IconName } from "../components/Icon";
 import { NumericKeypad, type KeypadKey } from "../components/NumericKeypad";
 import { SegmentedControl } from "../components/SegmentedControl";
 import { colors, iconSize, radius, spacing, typography } from "../constants/theme";
-import { MOCK_CATEGORY_OPTIONS, MOCK_INCOME_SOURCES } from "../lib/mock-data";
+import { MOCK_INCOME_SOURCES } from "../lib/mock-data";
 import { useStore, type TransactionType } from "../lib/store";
 
 /** Сегодняшняя дата как YYYY-MM-DD. */
@@ -38,7 +38,7 @@ const SEGMENTS: { value: TransactionType; label: string }[] = [
 
 export default function AddTransactionScreen() {
   const router = useRouter();
-  const { addTransaction } = useStore();
+  const { addTransaction, categories } = useStore();
 
   const [type, setType] = useState<TransactionType>("expense");
   const [amount, setAmount] = useState("");
@@ -50,7 +50,11 @@ export default function AddTransactionScreen() {
   const isIncome = type === "income";
   // Доход — позитивное событие, поэтому акцент зелёный, а не тёмный.
   const accent = isIncome ? colors.positive : colors.surfaceInverse;
-  const options = isIncome ? MOCK_INCOME_SOURCES : MOCK_CATEGORY_OPTIONS;
+  // Категории берём из стора, а не из моков: созданные в этой сессии должны
+  // сразу быть доступны для трат.
+  const options = isIncome
+    ? MOCK_INCOME_SOURCES
+    : categories.map((category) => ({ name: category.name, icon: category.icon }));
 
   const canSave = amount.trim().length > 0 && Number(amount) > 0 && selected !== null;
   const isToday = date === today();
