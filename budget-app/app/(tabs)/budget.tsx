@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Card, CardRow } from "../../components/Card";
 import { CategoryCard } from "../../components/CategoryCard";
-import { ProgressRing } from "../../components/Progress";
+import { ProgressRing, spendProgress } from "../../components/Progress";
 import { ReadyToAssignPill } from "../../components/ReadyToAssignPill";
 import { colors, spacing, typography } from "../../constants/theme";
 import { formatMoney } from "../../lib/mock-data";
@@ -12,11 +12,12 @@ import { useStore, type ResolvedCategory } from "../../lib/store";
 
 /**
  * Fixed-категория: слева потрачено из плана, справа остаток. Перерасход
- * помечается только точкой — полоса и сумма остаются нейтральными.
+ * виден красным хвостом полосы — сумма остаётся нейтральной.
  */
 function FixedRow({ category }: { category: ResolvedCategory }) {
   const spent = category.spent ?? 0;
   const remaining = category.assigned - spent;
+  const bar = spendProgress(spent, category.assigned);
 
   return (
     <CategoryCard
@@ -24,7 +25,8 @@ function FixedRow({ category }: { category: ResolvedCategory }) {
       icon={category.icon}
       value={`${formatMoney(remaining)} left`}
       overspent={remaining < 0}
-      progress={category.assigned === 0 ? 0 : spent / category.assigned}
+      progress={bar.value}
+      overspend={bar.overspend}
       caption={`${formatMoney(spent)} of ${formatMoney(category.assigned)}`}
     />
   );

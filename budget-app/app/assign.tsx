@@ -6,7 +6,7 @@ import { Button } from "../components/Button";
 import { Card, CardRow } from "../components/Card";
 import { IconTile } from "../components/IconTile";
 import { ModalScreen } from "../components/ModalScreen";
-import { ProgressBar } from "../components/Progress";
+import { ProgressBar, spendProgress } from "../components/Progress";
 import {
   OVERSPEND_DOT_SIZE,
   colors,
@@ -158,14 +158,16 @@ export default function AssignScreen() {
                 width: OVERSPEND_DOT_SIZE,
                 height: OVERSPEND_DOT_SIZE,
                 borderRadius: radius.pill,
-                backgroundColor: colors.overspendDot,
+                backgroundColor: colors.overspend,
               }}
             />
           ) : null}
         </View>
 
         <ProgressBar
-          value={readyToAssign > 0 ? assignedSum / readyToAssign : 0}
+          // Та же раскладка, что и у трат: зелёное — разложенное по плану,
+          // красный хвост — насколько разложили больше, чем есть.
+          {...spendProgress(assignedSum, readyToAssign)}
           tone="positive"
           height={progressHeight.card}
           style={{ marginTop: spacing.md }}

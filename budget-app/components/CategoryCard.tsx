@@ -21,9 +21,12 @@ type CategoryCardProps = {
   caption?: string;
   /** 0..1. Не передавать — полосы не будет. */
   progress?: number;
+  /** 0..1 — красный хвост полосы на величину перерасхода. См. spendProgress. */
+  overspend?: number;
   /**
-   * Перерасход. Показывается только точкой рядом со значением: ни полоса,
-   * ни сумма красными не становятся.
+   * Перерасход. Сигналит точкой рядом со значением — но только когда полосы
+   * нет: при полосе перерасход уже виден красным хвостом. Сумма в любом
+   * случае остаётся нейтральной по цвету.
    */
   overspent?: boolean;
   /** Слот справа — например кольцо прогресса у Savings. */
@@ -44,10 +47,14 @@ export function CategoryCard({
   value,
   caption,
   progress,
+  overspend = 0,
   overspent = false,
   accessory,
   style,
 }: CategoryCardProps) {
+  const hasBar = typeof progress === "number";
+  // Точка — запасной сигнал для строк без полосы (например savings с кольцом).
+  const showDot = overspent && !hasBar;
   return (
     <View
       style={[
@@ -74,14 +81,14 @@ export function CategoryCard({
           <Text style={[typography.headline, { color: colors.text }]}>{name}</Text>
 
           <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
-            {overspent ? (
+            {showDot ? (
               <View
                 accessibilityLabel="Overspent"
                 style={{
                   width: OVERSPEND_DOT_SIZE,
                   height: OVERSPEND_DOT_SIZE,
                   borderRadius: radius.pill,
-                  backgroundColor: colors.overspendDot,
+                  backgroundColor: colors.overspend,
                 }}
               />
             ) : null}
@@ -99,8 +106,8 @@ export function CategoryCard({
           </Text>
         ) : null}
 
-        {typeof progress === "number" ? (
-          <ProgressBar value={progress} style={{ marginTop: 7 }} />
+        {hasBar ? (
+          <ProgressBar value={progress} overspend={overspend} style={{ marginTop: 7 }} />
         ) : null}
       </View>
 

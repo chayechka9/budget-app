@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Card, CardRow } from "../../components/Card";
 import { Icon } from "../../components/Icon";
 import { IconTile } from "../../components/IconTile";
-import { ProgressBar } from "../../components/Progress";
+import { ProgressBar, spendProgress } from "../../components/Progress";
 import { ReadyToAssignPill } from "../../components/ReadyToAssignPill";
 import { TransactionRow } from "../../components/TransactionRow";
 import {
@@ -138,7 +138,7 @@ export default function HomeScreen() {
           </View>
 
           <ProgressBar
-            value={planned === 0 ? 0 : spent / planned}
+            {...spendProgress(spent, planned)}
             height={progressHeight.card}
             style={{ marginTop: 10 }}
           />

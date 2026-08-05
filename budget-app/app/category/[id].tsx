@@ -4,7 +4,7 @@ import { Text, View } from "react-native";
 import { Card, CardRow } from "../../components/Card";
 import { Icon } from "../../components/Icon";
 import { ModalScreen } from "../../components/ModalScreen";
-import { ProgressBar, ProgressRing } from "../../components/Progress";
+import { ProgressBar, ProgressRing, spendProgress } from "../../components/Progress";
 import {
   OVERSPEND_DOT_SIZE,
   colors,
@@ -33,7 +33,7 @@ function SpendSummary({ category }: { category: ResolvedCategory }) {
       </Text>
 
       <ProgressBar
-        value={category.assigned === 0 ? 0 : spent / category.assigned}
+        {...spendProgress(spent, category.assigned)}
         height={progressHeight.card}
         style={{ marginTop: spacing.md }}
       />
@@ -71,7 +71,7 @@ function SpendSummary({ category }: { category: ResolvedCategory }) {
               width: OVERSPEND_DOT_SIZE,
               height: OVERSPEND_DOT_SIZE,
               borderRadius: radius.pill,
-              backgroundColor: colors.overspendDot,
+              backgroundColor: colors.overspend,
             }}
           />
           <Text style={[typography.caption, { color: colors.textSecondary, flex: 1 }]}>

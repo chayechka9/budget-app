@@ -45,6 +45,25 @@ export type IconName =
   | "income"
   | "wallet";
 
+/**
+ * Иконки, из которых выбирают при создании категории. Только предметные
+ * глифы: навигационные и служебные (шевроны, крестик, плюс) в этот список
+ * не попадают.
+ */
+export const CATEGORY_ICONS = [
+  "rent",
+  "groceries",
+  "utilities",
+  "transport",
+  "eatingOut",
+  "subscriptions",
+  "emergency",
+  "trip",
+  "laptop",
+  "income",
+  "wallet",
+] as const satisfies readonly IconName[];
+
 type IconProps = {
   name: IconName;
   size?: number;
