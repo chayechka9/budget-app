@@ -1,4 +1,3 @@
-import { useRouter } from "expo-router";
 import { useState } from "react";
 import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
 
@@ -10,6 +9,7 @@ import { SegmentedControl } from "../components/SegmentedControl";
 import { colors, iconSize, radius, spacing, typography } from "../constants/theme";
 import { MOCK_INCOME_SOURCES } from "../lib/mock-data";
 import { useStore, type TransactionType } from "../lib/store";
+import { useCloseScreen } from "../lib/navigation";
 
 /** Сегодняшняя дата как YYYY-MM-DD. */
 function today(): string {
@@ -37,7 +37,7 @@ const SEGMENTS: { value: TransactionType; label: string }[] = [
 ];
 
 export default function AddTransactionScreen() {
-  const router = useRouter();
+  const close = useCloseScreen();
   const { addTransaction, categories } = useStore();
 
   const [type, setType] = useState<TransactionType>("expense");
@@ -76,11 +76,11 @@ export default function AddTransactionScreen() {
       note,
       date,
     });
-    router.back();
+    close();
   };
 
   return (
-    <BottomSheet title="New transaction" onClose={() => router.back()}>
+    <BottomSheet title="New transaction" onClose={() => close()}>
       <ScrollView
         style={{ flexShrink: 1 }}
         contentContainerStyle={{ flexGrow: 0 }}

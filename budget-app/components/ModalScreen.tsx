@@ -1,8 +1,8 @@
-import { useRouter } from "expo-router";
 import type { PropsWithChildren } from "react";
 import { ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { useCloseScreen } from "../lib/navigation";
 import { colors, spacing } from "../constants/theme";
 import { CircleButton } from "./CircleButton";
 
@@ -15,7 +15,7 @@ import { CircleButton } from "./CircleButton";
  * руками на каждом, они рано или поздно разъедутся.
  */
 export function ModalScreen({ children }: PropsWithChildren) {
-  const router = useRouter();
+  const close = useCloseScreen();
   const insets = useSafeAreaInsets();
 
   return (
@@ -30,7 +30,7 @@ export function ModalScreen({ children }: PropsWithChildren) {
       }}
     >
       <View style={{ flexDirection: "row", justifyContent: "flex-end" }}>
-        <CircleButton icon="close" label="Close" glyphSize={13} onPress={() => router.back()} />
+        <CircleButton icon="close" label="Close" glyphSize={13} onPress={close} />
       </View>
 
       {children}

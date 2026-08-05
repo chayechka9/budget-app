@@ -1,4 +1,3 @@
-import { useRouter } from "expo-router";
 import { useRef, useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
 
@@ -17,6 +16,7 @@ import {
 } from "../constants/theme";
 import { formatMoney } from "../lib/mock-data";
 import { useStore, type ResolvedCategory } from "../lib/store";
+import { useCloseScreen } from "../lib/navigation";
 
 /** Оставляем только цифры и одну точку с двумя знаками после неё. */
 function sanitizeAmount(input: string): string {
@@ -102,7 +102,7 @@ function AssignRow({ category, value, onChange }: AssignRowProps) {
 }
 
 export default function AssignScreen() {
-  const router = useRouter();
+  const close = useCloseScreen();
   const { groups, readyToAssign, assign } = useStore();
   const [draft, setDraft] = useState<Record<string, string>>({});
 
@@ -120,7 +120,7 @@ export default function AssignScreen() {
       if (amount > 0) amounts[categoryId] = amount;
     }
     assign(amounts);
-    router.back();
+    close();
   };
 
   return (

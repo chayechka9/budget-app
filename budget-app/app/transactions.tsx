@@ -16,6 +16,7 @@ import {
   type MockTransaction,
 } from "../lib/mock-data";
 import { useStore } from "../lib/store";
+import { useCloseScreen } from "../lib/navigation";
 
 type Day = { key: string; label: string; items: MockTransaction[] };
 
@@ -37,6 +38,7 @@ function groupByDay(transactions: MockTransaction[]): Day[] {
 
 export default function TransactionsScreen() {
   const router = useRouter();
+  const close = useCloseScreen();
   const insets = useSafeAreaInsets();
   const { transactions } = useStore();
 
@@ -87,7 +89,7 @@ export default function TransactionsScreen() {
               icon="chevronLeft"
               label="Back"
               glyphSize={17}
-              onPress={() => router.back()}
+              onPress={() => close()}
             />
           </View>
 

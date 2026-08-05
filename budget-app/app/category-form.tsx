@@ -1,4 +1,4 @@
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 
@@ -11,6 +11,7 @@ import { SegmentedControl } from "../components/SegmentedControl";
 import { colors, radius, spacing, typography } from "../constants/theme";
 import type { CategoryKind } from "../lib/mock-data";
 import { useStore, type ResolvedCategory } from "../lib/store";
+import { useCloseScreen } from "../lib/navigation";
 
 /** Значение чипса «New group» — своей группы у него нет. */
 const NEW_GROUP = "__new__";
@@ -95,7 +96,7 @@ function initialValues(editing: ResolvedCategory | undefined, fallbackGroupId: s
  * экран заводить не стали: поля совпадают полностью, и они бы разъехались.
  */
 export default function CategoryFormScreen() {
-  const router = useRouter();
+  const close = useCloseScreen();
   const { id } = useLocalSearchParams<{ id?: string }>();
   const { groups, categories, addCategory, updateCategory } = useStore();
 
@@ -149,7 +150,7 @@ export default function CategoryFormScreen() {
     } else {
       addCategory(draft);
     }
-    router.back();
+    close();
   };
 
   return (
