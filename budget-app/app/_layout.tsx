@@ -6,6 +6,12 @@ import { StatusBar } from "expo-status-bar";
 
 import { StoreProvider } from "../lib/store";
 
+/**
+ * Экраны, которые в макете лежат поверх всего и закрываются крестиком.
+ * Шапку им рисует `ModalScreen` — он же держит единый паттерн закрытия.
+ */
+const MODAL = { presentation: "modal" } as const;
+
 export default function RootLayout() {
   return (
     <StoreProvider>
@@ -28,6 +34,11 @@ export default function RootLayout() {
             animation: "fade",
           }}
         />
+        <Stack.Screen name="assign" options={MODAL} />
+        <Stack.Screen name="spending" options={MODAL} />
+        <Stack.Screen name="wrapped-up" options={MODAL} />
+        <Stack.Screen name="category/[id]" options={MODAL} />
+        <Stack.Screen name="transaction/[id]" options={MODAL} />
       </Stack>
     </StoreProvider>
   );

@@ -1,3 +1,4 @@
+import { useRouter } from "expo-router";
 import { ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -6,24 +7,23 @@ import { CategoryCard } from "../../components/CategoryCard";
 import { ProgressRing } from "../../components/Progress";
 import { ReadyToAssignPill } from "../../components/ReadyToAssignPill";
 import { colors, spacing, typography } from "../../constants/theme";
-import { MOCK_GROUPS, type MockCategory, formatMoney } from "../../lib/mock-data";
-import { useStore } from "../../lib/store";
+import { formatMoney } from "../../lib/mock-data";
+import { useStore, type ResolvedCategory } from "../../lib/store";
 
 /**
  * Fixed-категория: слева потрачено из плана, справа остаток. Перерасход
  * помечается только точкой — полоса и сумма остаются нейтральными.
  */
-function FixedRow({ category, extraSpent }: { category: MockCategory; extraSpent: number }) {
-  const spent = (category.spent ?? 0) + extraSpent;
+function FixedRow({ category }: { category: ResolvedCategory }) {
+  const spent = category.spent ?? 0;
   const remaining = category.assigned - spent;
-  const overspent = remaining < 0;
 
   return (
     <CategoryCard
       name={category.name}
       icon={category.icon}
       value={`${formatMoney(remaining)} left`}
-      overspent={overspent}
+      overspent={remaining < 0}
       progress={category.assigned === 0 ? 0 : spent / category.assigned}
       caption={`${formatMoney(spent)} of ${formatMoney(category.assigned)}`}
     />
@@ -31,7 +31,7 @@ function FixedRow({ category, extraSpent }: { category: MockCategory; extraSpent
 }
 
 /** Savings-категория: накопленное с кольцом прогресса справа. */
-function SavingsRow({ category }: { category: MockCategory }) {
+function SavingsRow({ category }: { category: ResolvedCategory }) {
   const hasTarget = typeof category.target === "number" && category.target > 0;
   const ratio = hasTarget ? category.assigned / (category.target as number) : 0;
 
@@ -51,8 +51,9 @@ function SavingsRow({ category }: { category: MockCategory }) {
 }
 
 export default function BudgetScreen() {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { readyToAssign, extraSpentByCategory } = useStore();
+  const { groups, readyToAssign } = useStore();
 
   return (
     <ScrollView
@@ -60,10 +61,13 @@ export default function BudgetScreen() {
       contentContainerStyle={{ paddingTop: insets.top + 19, paddingBottom: spacing.xxxl }}
     >
       <View style={{ paddingHorizontal: spacing.xl, flexDirection: "row" }}>
-        <ReadyToAssignPill amount={formatMoney(readyToAssign)} />
+        <ReadyToAssignPill
+          amount={formatMoney(readyToAssign)}
+          onPress={() => router.push("/assign")}
+        />
       </View>
 
-      {MOCK_GROUPS.map((group) => (
+      {groups.map((group) => (
         <View key={group.id} style={{ marginTop: 22 }}>
           <Text
             style={[
@@ -75,14 +79,15 @@ export default function BudgetScreen() {
           </Text>
           <Card list style={{ marginHorizontal: spacing.lg }}>
             {group.categories.map((category, index) => (
-              <CardRow key={category.id} first={index === 0}>
+              <CardRow
+                key={category.id}
+                first={index === 0}
+                onPress={() => router.push(`/category/${category.id}`)}
+              >
                 {category.kind === "savings" ? (
                   <SavingsRow category={category} />
                 ) : (
-                  <FixedRow
-                    category={category}
-                    extraSpent={extraSpentByCategory[category.name] ?? 0}
-                  />
+                  <FixedRow category={category} />
                 )}
               </CardRow>
             ))}

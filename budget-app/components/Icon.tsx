@@ -27,6 +27,7 @@ export type IconName =
   // Интерфейс
   | "chevronRight"
   | "chevronLeft"
+  | "chevronDown"
   | "close"
   | "calendar"
   | "calendarCheck"
@@ -116,6 +117,8 @@ function renderGlyph(name: IconName, stroke: string) {
       return <Path d="M9 5l7 7-7 7" {...c} strokeWidth={2} />;
     case "chevronLeft":
       return <Path d="M15 5l-7 7 7 7" {...c} strokeWidth={2.4} />;
+    case "chevronDown":
+      return <Path d="M6 9l6 6 6-6" {...c} strokeWidth={2} />;
     case "close":
       return <Path d="M6 6l12 12M18 6L6 18" {...c} strokeWidth={STROKE} />;
     case "calendar":

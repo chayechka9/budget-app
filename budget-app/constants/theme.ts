@@ -20,6 +20,8 @@ export const colors = {
   background: "#F6F6F3",
   /** Тот же фон, но полупрозрачный — панель таб-бара. */
   backgroundTranslucent: "rgba(246, 246, 243, 0.88)",
+  /** Фон модальных экранов — в макете на полтона светлее обычного. */
+  backgroundModal: "#FAFAF7",
   /** Карточки и списки — в макете это чистый белый. */
   surface: "#FFFFFF",
   /** Наведение/нажатие на строку списка. */
@@ -125,6 +127,8 @@ export const radius = {
   tile: 12,
   /** Плашка 42px в карточке итогов месяца. */
   tileLarge: 14,
+  /** Выпадающий список и спокойные заметки внутри карточки. */
+  dropdown: 16,
   /** Карточка-список. */
   card: 22,
   /** Карточка с содержимым. */
@@ -184,6 +188,15 @@ export const typography = {
     letterSpacing: -1,
     ...tabularNums,
   },
+  /** Сумма второго плана в карточке: 22/700/-0.4. */
+  amountMedium: {
+    fontFamily,
+    fontSize: 22,
+    lineHeight: 27,
+    fontWeight: "700",
+    letterSpacing: -0.4,
+    ...tabularNums,
+  },
   /** Сумма внутри карточки: 27/700/-0.6. */
   amount: {
     fontFamily,
@@ -216,6 +229,14 @@ export const typography = {
     lineHeight: 36,
     fontWeight: "700",
     letterSpacing: -0.6,
+  },
+  /** Заголовок экрана деталей: 22/700/-0.4. */
+  detailTitle: {
+    fontFamily,
+    fontSize: 22,
+    lineHeight: 27,
+    fontWeight: "700",
+    letterSpacing: -0.4,
   },
   /** Заголовок карточки и название строки: 15/600. */
   headline: {
@@ -269,6 +290,13 @@ export const typography = {
     fontWeight: "600",
     letterSpacing: 1.6,
     textTransform: "uppercase",
+  },
+  /** Подпись сегмент-контрола: 12.5/600. */
+  segmentLabel: {
+    fontFamily,
+    fontSize: 12.5,
+    lineHeight: 17,
+    fontWeight: "600",
   },
   /** Подпись вкладки таб-бара: 10.5/600. */
   tabLabel: {

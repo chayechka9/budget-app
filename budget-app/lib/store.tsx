@@ -1,15 +1,21 @@
 import { createContext, useContext, useMemo, useState, type PropsWithChildren } from "react";
 
 import type { IconName } from "../components/Icon";
-import { MOCK_SUMMARY, MOCK_TRANSACTIONS, type MockTransaction } from "./mock-data";
+import {
+  MOCK_GROUPS,
+  MOCK_SUMMARY,
+  MOCK_TRANSACTIONS,
+  type MockCategory,
+  type MockTransaction,
+} from "./mock-data";
 
 /**
  * Временное хранилище в памяти.
  *
  * Настоящее локальное хранение (expo-sqlite/AsyncStorage) — это Stage 1 из
- * BUDGET_APP_SPEC.md. Здесь только то, что нужно, чтобы Save реально менял
- * цифры на экранах: моки из mock-data служат стартовым срезом, а добавленные
- * транзакции накладываются поверх. При перезапуске всё сбрасывается.
+ * BUDGET_APP_SPEC.md. Здесь только то, что нужно, чтобы действия реально
+ * меняли цифры на экранах: моки из mock-data служат стартовым срезом, а
+ * правки сессии накладываются поверх. При перезапуске всё сбрасывается.
  */
 
 export type TransactionType = "expense" | "income";
@@ -25,20 +31,39 @@ export interface NewTransaction {
   date: string;
 }
 
+/**
+ * Категория с уже применёнными правками сессии. Экраны берут только её и не
+ * складывают моки с дельтами у себя — иначе Home и Budget разъезжаются.
+ */
+export interface ResolvedCategory extends MockCategory {
+  groupId: string;
+  groupName: string;
+}
+
+export interface ResolvedGroup {
+  id: string;
+  name: string;
+  categories: ResolvedCategory[];
+}
+
 interface Store {
   transactions: MockTransaction[];
+  /** Группы с учётом добавленных трат и распределённых денег. */
+  groups: ResolvedGroup[];
+  /** Тот же список плоско — для поиска категории по id. */
+  categories: ResolvedCategory[];
   totalBalance: number;
   readyToAssign: number;
-  savedThisMonth: number;
-  /** Сколько ещё потрачено по категории сверх стартового среза. */
-  extraSpentByCategory: Record<string, number>;
   addTransaction: (input: NewTransaction) => void;
+  /** Разложить деньги из Ready to assign по категориям: id категории → сумма. */
+  assign: (amountByCategoryId: Record<string, number>) => void;
 }
 
 const StoreContext = createContext<Store | null>(null);
 
 export function StoreProvider({ children }: PropsWithChildren) {
   const [added, setAdded] = useState<MockTransaction[]>([]);
+  const [assignedByCategory, setAssignedByCategory] = useState<Record<string, number>>({});
 
   const value = useMemo<Store>(() => {
     // Расход уменьшает баланс, доход увеличивает.
@@ -57,12 +82,34 @@ export function StoreProvider({ children }: PropsWithChildren) {
         (extraSpentByCategory[transaction.category] ?? 0) + spent;
     }
 
+    const assignedTotal = Object.values(assignedByCategory).reduce(
+      (sum, amount) => sum + amount,
+      0,
+    );
+
+    const groups: ResolvedGroup[] = MOCK_GROUPS.map((group) => ({
+      id: group.id,
+      name: group.name,
+      categories: group.categories.map((category) => ({
+        ...category,
+        groupId: group.id,
+        groupName: group.name,
+        // У fixed это план на месяц, у savings — уже накопленное. Assign
+        // пополняет и то, и другое.
+        assigned: category.assigned + (assignedByCategory[category.id] ?? 0),
+        spent:
+          category.kind === "fixed"
+            ? (category.spent ?? 0) + (extraSpentByCategory[category.name] ?? 0)
+            : category.spent,
+      })),
+    }));
+
     return {
       transactions: [...added, ...MOCK_TRANSACTIONS],
+      groups,
+      categories: groups.flatMap((group) => group.categories),
       totalBalance: MOCK_SUMMARY.totalBalance + balanceDelta,
-      readyToAssign: MOCK_SUMMARY.readyToAssign + incomeDelta,
-      savedThisMonth: MOCK_SUMMARY.savedThisMonth,
-      extraSpentByCategory,
+      readyToAssign: MOCK_SUMMARY.readyToAssign + incomeDelta - assignedTotal,
       addTransaction: (input) => {
         const signedAmount = input.type === "income" ? input.amount : -input.amount;
         setAdded((current) => [
@@ -80,8 +127,18 @@ export function StoreProvider({ children }: PropsWithChildren) {
           ...current,
         ]);
       },
+      assign: (amountByCategoryId) => {
+        setAssignedByCategory((current) => {
+          const next = { ...current };
+          for (const [categoryId, amount] of Object.entries(amountByCategoryId)) {
+            if (!amount) continue;
+            next[categoryId] = (next[categoryId] ?? 0) + amount;
+          }
+          return next;
+        });
+      },
     };
-  }, [added]);
+  }, [added, assignedByCategory]);
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
 }

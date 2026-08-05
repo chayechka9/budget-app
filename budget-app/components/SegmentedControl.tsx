@@ -11,6 +11,8 @@ type SegmentedControlProps<T extends string> = {
   segments: Segment<T>[];
   value: T;
   onChange: (value: T) => void;
+  /** Мелкая подпись 12.5 — когда сегментов три и длинные названия. */
+  compact?: boolean;
 };
 
 /** Сегмент-контрол: активная пилюля на белом, неактивная — приглушённая. */
@@ -18,6 +20,7 @@ export function SegmentedControl<T extends string>({
   segments,
   value,
   onChange,
+  compact = false,
 }: SegmentedControlProps<T>) {
   return (
     <View
@@ -42,7 +45,8 @@ export function SegmentedControl<T extends string>({
                 flex: 1,
                 alignItems: "center",
                 justifyContent: "center",
-                paddingVertical: spacing.sm,
+                paddingVertical: compact ? 9 : spacing.sm,
+                paddingHorizontal: 4,
                 borderRadius: radius.tile - 2,
                 backgroundColor: active ? colors.surface : "transparent",
               },
@@ -50,9 +54,10 @@ export function SegmentedControl<T extends string>({
             ]}
           >
             <Text
+              numberOfLines={1}
               style={[
-                typography.headline,
-                { color: active ? colors.text : colors.textTertiary },
+                compact ? typography.segmentLabel : typography.headline,
+                { color: active ? colors.text : colors.textSecondary },
               ]}
             >
               {segment.label}

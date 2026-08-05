@@ -100,12 +100,30 @@ export const MOCK_INCOME_SOURCES: { name: string; icon: IconName }[] = [
 export const MOCK_MONTH_LABEL = "August";
 
 /**
- * Итог прошлого месяца — карточка «July wrapped up» на Home.
+ * Итог прошлого месяца — карточка «July wrapped up» на Home и экран Wrapped up.
  * Настоящий расчёт появится вместе с месячными срезами на Stage 1.
  */
 export const MOCK_LAST_MONTH = {
   label: "July",
   leftUnspent: 113.4,
+  /** Из чего сложился остаток — разбивка на экране Wrapped up. */
+  breakdown: [
+    { name: "Groceries", amount: 41.2 },
+    { name: "Utilities", amount: 28.6 },
+    { name: "Eating out", amount: 43.6 },
+  ],
+  /**
+   * Факт трат по категориям за прошлый месяц — база для вкладки Trend.
+   * Ключ — название категории, как в `MockTransaction.category`.
+   */
+  spentByCategory: {
+    Rent: 1450,
+    Groceries: 424.6,
+    Utilities: 124.8,
+    Transport: 96.4,
+    "Eating out": 168.2,
+    Subscriptions: 45,
+  } as Record<string, number>,
 };
 
 export const MOCK_SUMMARY = {
@@ -113,8 +131,6 @@ export const MOCK_SUMMARY = {
   totalBalance: 8420.35,
   /** Ещё не распределено по категориям. */
   readyToAssign: 314.2,
-  /** Позитивный хайлайт — сколько отложено в этом месяце. */
-  savedThisMonth: 480,
 };
 
 export function formatMoney(amount: number): string {
@@ -123,4 +139,107 @@ export function formatMoney(amount: number): string {
     maximumFractionDigits: 2,
   });
   return `${amount < 0 ? "−" : ""}€${formatted}`;
+}
+
+/** Сумма со знаком: «+€52.10» / «−€41.20» / «€0.00». */
+export function formatSignedMoney(amount: number): string {
+  if (amount > 0.005) return `+${formatMoney(amount)}`;
+  return formatMoney(amount);
+}
+
+const MONTHS_SHORT = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+
+const MONTHS_LONG = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+/**
+ * Даты в моках — строки «2026-08-02». Разбираем их вручную, а не через
+ * `new Date(iso)`: тот трактует такую строку как UTC-полночь и в минусовых
+ * таймзонах отдаёт предыдущий день.
+ */
+function parseIsoDate(iso: string): Date {
+  const [year, month, day] = iso.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function startOfToday(): Date {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Заголовок группы дня в Activity: «Today» / «Yesterday» / «2 Aug». */
+export function formatDayLabel(iso: string): string {
+  const date = parseIsoDate(iso);
+  const daysAgo = Math.round((startOfToday().getTime() - date.getTime()) / DAY_MS);
+  if (daysAgo === 0) return "Today";
+  if (daysAgo === 1) return "Yesterday";
+  return `${date.getDate()} ${MONTHS_SHORT[date.getMonth()]}`;
+}
+
+/** Ключ месяца для группировки и фильтров: «2026-08». */
+export function monthKeyOf(iso: string): string {
+  return iso.slice(0, 7);
+}
+
+/** Ключ месяца в подпись: «2026-08» → «August 2026». */
+export function formatMonthKey(key: string): string {
+  const [year, month] = key.split("-").map(Number);
+  return `${MONTHS_LONG[month - 1]} ${year}`;
+}
+
+/** Сколько дней осталось до конца текущего месяца. */
+export function daysLeftInMonth(): number {
+  const now = new Date();
+  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  return Math.max(0, lastDay - now.getDate());
+}
+
+/** Последние `count` дней, включая сегодня, в виде ISO-строк. */
+export function recentDays(count: number): string[] {
+  const today = startOfToday();
+  const days: string[] = [];
+  for (let offset = count - 1; offset >= 0; offset--) {
+    const date = new Date(today.getTime() - offset * DAY_MS);
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    days.push(`${date.getFullYear()}-${month}-${day}`);
+  }
+  return days;
+}
+
+/** Номер дня для подписи под столбиком графика. */
+export function dayOfMonth(iso: string): number {
+  return parseIsoDate(iso).getDate();
+}
+
+function hashId(id: string): number {
+  let hash = 0;
+  for (let index = 0; index < id.length; index++) {
+    hash = (hash * 31 + id.charCodeAt(index)) >>> 0;
+  }
+  return hash;
+}
+
+/**
+ * Время и способ оплаты транзакции. В моках их нет, а карточка детали их
+ * показывает — выводим из id, чтобы значение было стабильным между рендерами
+ * и не «прыгало». Настоящие поля появятся вместе с хранилищем на Stage 1.
+ */
+export function transactionTime(id: string): string {
+  const hash = hashId(id);
+  const hours = 8 + (hash % 13);
+  const minutes = (hash >> 3) % 60;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
+
+export function transactionMethod(id: string, isIncome: boolean): string {
+  if (isIncome) return "Transfer";
+  return hashId(id) % 3 === 0 ? "Cash" : "Card";
 }

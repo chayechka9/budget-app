@@ -1,5 +1,5 @@
-import type { PropsWithChildren } from "react";
-import { View, type ViewProps } from "react-native";
+import { useState, type PropsWithChildren } from "react";
+import { Pressable, View, type ViewProps } from "react-native";
 
 import { HAIRLINE, colors, radius, shadows, spacing } from "../constants/theme";
 
@@ -31,25 +31,46 @@ export function Card({ list = false, style, children, ...rest }: CardProps) {
   );
 }
 
-/** Строка внутри Card list — с волосяным разделителем сверху, кроме первой. */
+/**
+ * Строка внутри Card list — с волосяным разделителем сверху, кроме первой.
+ * С `onPress` становится кликабельной и подсвечивается при нажатии.
+ */
 export function CardRow({
   first = false,
+  onPress,
   style,
   children,
   ...rest
-}: PropsWithChildren<ViewProps & { first?: boolean }>) {
+}: PropsWithChildren<ViewProps & { first?: boolean; onPress?: () => void }>) {
+  const [pressed, setPressed] = useState(false);
+
+  const separator = {
+    borderTopWidth: first ? 0 : HAIRLINE,
+    borderTopColor: colors.separator,
+  } as const;
+
+  if (!onPress) {
+    return (
+      <View {...rest} style={[separator, style]}>
+        {children}
+      </View>
+    );
+  }
+
   return (
-    <View
+    <Pressable
       {...rest}
+      accessibilityRole="button"
+      onPress={onPress}
+      onPressIn={() => setPressed(true)}
+      onPressOut={() => setPressed(false)}
       style={[
-        {
-          borderTopWidth: first ? 0 : HAIRLINE,
-          borderTopColor: colors.separator,
-        },
+        separator,
+        pressed ? { backgroundColor: colors.surfacePressed } : null,
         style,
       ]}
     >
       {children}
-    </View>
+    </Pressable>
   );
 }

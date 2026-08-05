@@ -2,14 +2,13 @@ import { useRouter } from "expo-router";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { Card } from "../../components/Card";
+import { Card, CardRow } from "../../components/Card";
 import { Icon } from "../../components/Icon";
 import { IconTile } from "../../components/IconTile";
 import { ProgressBar } from "../../components/Progress";
 import { ReadyToAssignPill } from "../../components/ReadyToAssignPill";
 import { TransactionRow } from "../../components/TransactionRow";
 import {
-  HAIRLINE,
   colors,
   iconSize,
   progressHeight,
@@ -18,40 +17,27 @@ import {
   typography,
 } from "../../constants/theme";
 import {
-  MOCK_GROUPS,
   MOCK_LAST_MONTH,
   MOCK_MONTH_LABEL,
+  daysLeftInMonth,
   formatMoney,
 } from "../../lib/mock-data";
 import { useStore } from "../../lib/store";
 
 const RECENT_COUNT = 3;
 
-/** Сколько дней осталось до конца текущего месяца. */
-function daysLeftInMonth(): number {
-  const now = new Date();
-  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-  return Math.max(0, lastDay - now.getDate());
-}
-
 export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { transactions, totalBalance, readyToAssign, extraSpentByCategory } = useStore();
+  const { transactions, totalBalance, readyToAssign, categories } = useStore();
 
   const recent = transactions.slice(0, RECENT_COUNT);
 
   // Сводка по тратам считается из тех же категорий, что показывает Budget —
   // отдельной логики данных здесь нет.
-  const fixed = MOCK_GROUPS.flatMap((group) =>
-    group.categories.filter((category) => category.kind === "fixed"),
-  );
+  const fixed = categories.filter((category) => category.kind === "fixed");
   const planned = fixed.reduce((sum, category) => sum + category.assigned, 0);
-  const spent = fixed.reduce(
-    (sum, category) =>
-      sum + (category.spent ?? 0) + (extraSpentByCategory[category.name] ?? 0),
-    0,
-  );
+  const spent = fixed.reduce((sum, category) => sum + (category.spent ?? 0), 0);
   const stillToSpend = Math.max(0, planned - spent);
   const daysLeft = daysLeftInMonth();
 
@@ -82,78 +68,91 @@ export default function HomeScreen() {
       <View style={{ marginTop: spacing.lg, flexDirection: "row" }}>
         <ReadyToAssignPill
           amount={formatMoney(readyToAssign)}
-          onPress={() => router.push("/budget")}
+          onPress={() => router.push("/assign")}
         />
       </View>
 
       {/* Итог прошлого месяца */}
-      <Card
-        style={{
-          marginTop: 22,
-          borderRadius: radius.card,
-          paddingVertical: spacing.lg,
-          paddingHorizontal: 18,
-        }}
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => router.push("/wrapped-up")}
+        style={{ marginTop: 22 }}
       >
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
-          <IconTile name="calendarCheck" size={42} tone="positive" />
-          <View style={{ flex: 1 }}>
-            <Text style={[typography.headline, { color: colors.text }]}>
-              {MOCK_LAST_MONTH.label} wrapped up
-            </Text>
-            <Text style={[typography.caption, { color: colors.textSecondary, marginTop: 2 }]}>
-              <Text style={[typography.amountCaption, { color: colors.positiveText }]}>
-                {formatMoney(MOCK_LAST_MONTH.leftUnspent)}
-              </Text>{" "}
-              left unspent
-            </Text>
+        <Card
+          style={{
+            borderRadius: radius.card,
+            paddingVertical: spacing.lg,
+            paddingHorizontal: 18,
+          }}
+        >
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
+            <IconTile name="calendarCheck" size={42} tone="positive" />
+            <View style={{ flex: 1 }}>
+              <Text style={[typography.headline, { color: colors.text }]}>
+                {MOCK_LAST_MONTH.label} wrapped up
+              </Text>
+              <Text style={[typography.caption, { color: colors.textSecondary, marginTop: 2 }]}>
+                <Text style={[typography.amountCaption, { color: colors.positiveText }]}>
+                  {formatMoney(MOCK_LAST_MONTH.leftUnspent)}
+                </Text>{" "}
+                left unspent
+              </Text>
+            </View>
+            <Icon name="chevronRight" size={iconSize.chevron} color={colors.textFaint} />
           </View>
-          <Icon name="chevronRight" size={iconSize.chevron} color={colors.textFaint} />
-        </View>
-      </Card>
+        </Card>
+      </Pressable>
 
       {/* Траты за месяц */}
-      <Card style={{ marginTop: 22 }}>
-        <View
-          style={{
-            flexDirection: "row",
-            justifyContent: "space-between",
-            alignItems: "baseline",
-          }}
-        >
-          <Text style={[typography.headline, { color: colors.text }]}>Spending</Text>
-          <Text style={[typography.caption, { color: colors.textTertiary }]}>
-            {daysLeft} days left
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => router.push("/spending")}
+        style={{ marginTop: 22 }}
+      >
+        <Card>
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+              alignItems: "baseline",
+            }}
+          >
+            <Text style={[typography.headline, { color: colors.text }]}>Spending</Text>
+            <Text style={[typography.caption, { color: colors.textTertiary }]}>
+              {daysLeft} days left
+            </Text>
+          </View>
+
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "baseline",
+              gap: 6,
+              marginTop: 14,
+            }}
+          >
+            <Text style={[typography.amount, { color: colors.text }]}>{formatMoney(spent)}</Text>
+            <Text style={[typography.caption, { color: colors.textSecondary }]}>
+              of {formatMoney(planned)} planned
+            </Text>
+          </View>
+
+          <ProgressBar
+            value={planned === 0 ? 0 : spent / planned}
+            height={progressHeight.card}
+            style={{ marginTop: 10 }}
+          />
+
+          <Text
+            style={[typography.caption, { color: colors.textSecondary, marginTop: spacing.sm }]}
+          >
+            <Text style={[typography.amountCaption, { color: colors.positiveText }]}>
+              {formatMoney(stillToSpend)}
+            </Text>{" "}
+            still to spend
           </Text>
-        </View>
-
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "baseline",
-            gap: 6,
-            marginTop: 14,
-          }}
-        >
-          <Text style={[typography.amount, { color: colors.text }]}>{formatMoney(spent)}</Text>
-          <Text style={[typography.caption, { color: colors.textSecondary }]}>
-            of {formatMoney(planned)} planned
-          </Text>
-        </View>
-
-        <ProgressBar
-          value={planned === 0 ? 0 : spent / planned}
-          height={progressHeight.card}
-          style={{ marginTop: 10 }}
-        />
-
-        <Text style={[typography.caption, { color: colors.textSecondary, marginTop: spacing.sm }]}>
-          <Text style={[typography.amountCaption, { color: colors.positiveText }]}>
-            {formatMoney(stillToSpend)}
-          </Text>{" "}
-          still to spend
-        </Text>
-      </Card>
+        </Card>
+      </Pressable>
 
       {/* Последние транзакции */}
       <Card style={{ marginTop: spacing.lg }}>
@@ -165,7 +164,13 @@ export default function HomeScreen() {
           }}
         >
           <Text style={[typography.headline, { color: colors.text }]}>Recent</Text>
-          <Pressable accessibilityRole="button" onPress={() => router.push("/transactions")}>
+          {/* Текст сам по себе — цель ~50×17, для пальца мало. Добираем hitSlop,
+              а не отступами: они сдвинули бы «See all» относительно заголовка. */}
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.push("/transactions")}
+            hitSlop={{ top: 14, bottom: 14, left: 16, right: 16 }}
+          >
             <Text style={[typography.amountCaption, { color: colors.textSecondary }]}>
               See all
             </Text>
@@ -174,18 +179,20 @@ export default function HomeScreen() {
 
         <View style={{ marginTop: 6 }}>
           {recent.map((transaction) => (
-            <View
+            <CardRow
               key={transaction.id}
-              style={{ borderTopWidth: HAIRLINE, borderTopColor: colors.separator }}
+              onPress={() => router.push(`/transaction/${transaction.id}`)}
             >
+              {/* Без даты: свежие транзакции и так сверху, а дата уводит взгляд
+                  с того, куда ушли деньги. Полные даты — на Activity. */}
               <TransactionRow
                 compact
                 icon={transaction.icon}
                 title={transaction.payee}
-                subtitle={`${transaction.category} · ${transaction.date}`}
+                subtitle={transaction.category}
                 amount={transaction.amount}
               />
-            </View>
+            </CardRow>
           ))}
         </View>
       </Card>
