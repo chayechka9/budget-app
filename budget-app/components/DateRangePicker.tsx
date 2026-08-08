@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Modal, Pressable, Text, View } from "react-native";
+import { useRef, useState } from "react";
+import { Modal, Pressable, ScrollView, Text, View } from "react-native";
 
 import { colors, radius, spacing, typography } from "../constants/theme";
 import {
@@ -11,6 +11,7 @@ import {
 } from "../lib/analytics";
 import { Button } from "./Button";
 import { CircleButton } from "./CircleButton";
+import { Icon } from "./Icon";
 
 type DateRangePickerProps = {
   /** Диапазон, с которого открывается выбор. */
@@ -25,6 +26,18 @@ const WEEKDAYS = ["M", "T", "W", "T", "F", "S", "S"];
 
 const CELL_HEIGHT = 38;
 
+/** Высота области под сеткой дней — её же занимает выбор месяца и года. */
+const GRID_HEIGHT = CELL_HEIGHT * 6;
+
+/** На сколько лет назад можно уйти в выборе года. */
+const YEARS_BACK = 5;
+
+/** Высота строки в колонках выбора — из неё считается прокрутка к выбранному. */
+const COLUMN_ROW_HEIGHT = 39;
+
+/** Сколько строк оставить над выбранной, чтобы она не липла к верху колонки. */
+const COLUMN_LEAD_ROWS = 2;
+
 function daysInMonth(year: number, month: number): number {
   return new Date(year, month + 1, 0).getDate();
 }
@@ -37,6 +50,71 @@ function leadingBlanks(year: number, month: number): number {
 function formatShort(iso: string): string {
   const date = parseIsoDate(iso);
   return `${date.getDate()} ${MONTHS_SHORT[date.getMonth()]} ${date.getFullYear()}`;
+}
+
+type ColumnValue = {
+  key: string;
+  label: string;
+  selected: boolean;
+  disabled: boolean;
+  onPress: () => void;
+};
+
+/** Колонка выбора: месяцы слева, годы справа. Выбранное — чёрной плашкой. */
+function MonthYearColumn({ values }: { values: ColumnValue[] }) {
+  // Колонка открывается на выбранном значении: двенадцать месяцев в высоту
+  // не помещаются, и без прокрутки текущий выбор оказывался бы за кадром.
+  const scroller = useRef<ScrollView>(null);
+  const selectedIndex = values.findIndex((value) => value.selected);
+  const offset =
+    selectedIndex < 0
+      ? 0
+      : Math.max(0, (selectedIndex - COLUMN_LEAD_ROWS) * COLUMN_ROW_HEIGHT);
+
+  return (
+    <ScrollView
+      ref={scroller}
+      style={{ flex: 1 }}
+      showsVerticalScrollIndicator={false}
+      // Не `contentOffset`: на момент монтирования содержимое ещё не
+      // измерено, и iOS обрезает смещение до нулевой высоты. Здесь же
+      // размер уже известен. Выбор значения размер не меняет, так что
+      // ручную прокрутку это не перебивает.
+      onContentSizeChange={() => scroller.current?.scrollTo({ y: offset, animated: false })}
+      contentContainerStyle={{ gap: 2 }}
+    >
+      {values.map((value) => (
+        <Pressable
+          key={value.key}
+          accessibilityRole="button"
+          accessibilityState={{ selected: value.selected, disabled: value.disabled }}
+          disabled={value.disabled}
+          onPress={value.onPress}
+          style={{
+            paddingVertical: 9,
+            paddingHorizontal: spacing.md,
+            borderRadius: radius.tile,
+            backgroundColor: value.selected ? colors.surfaceInverse : "transparent",
+          }}
+        >
+          <Text
+            style={[
+              typography.rowTitle,
+              {
+                color: value.selected
+                  ? colors.textInverse
+                  : value.disabled
+                    ? colors.textFaint
+                    : colors.text,
+              },
+            ]}
+          >
+            {value.label}
+          </Text>
+        </Pressable>
+      ))}
+    </ScrollView>
+  );
 }
 
 /**
@@ -61,13 +139,8 @@ export function DateRangePicker({ from, to, onApply, onClose }: DateRangePickerP
     const date = parseIsoDate(to || today);
     return { year: date.getFullYear(), month: date.getMonth() };
   });
-
-  const shiftMonth = (delta: number) => {
-    setCursor((current) => {
-      const next = new Date(current.year, current.month + delta, 1);
-      return { year: next.getFullYear(), month: next.getMonth() };
-    });
-  };
+  /** Открыт выбор месяца и года вместо сетки дней. */
+  const [pickingMonth, setPickingMonth] = useState(false);
 
   const pick = (iso: string) => {
     // Есть обе границы — начинаем новый диапазон, а не двигаем старый:
@@ -100,8 +173,26 @@ export function DateRangePicker({ from, to, onApply, onClose }: DateRangePickerP
   ];
 
   const complete = start !== null && end !== null;
-  const canGoForward =
-    new Date(cursor.year, cursor.month + 1, 1) <= parseIsoDate(today);
+
+  const todayDate = parseIsoDate(today);
+  const currentYear = todayDate.getFullYear();
+  const currentMonth = todayDate.getMonth();
+  const years = Array.from(
+    { length: YEARS_BACK + 1 },
+    (_, index) => currentYear - YEARS_BACK + index,
+  );
+
+  /** Месяцы вперёд выбирать нечего: трат там ещё нет. */
+  const isFutureMonth = (year: number, month: number) =>
+    year > currentYear || (year === currentYear && month > currentMonth);
+
+  const moveCursor = (year: number, month: number) => {
+    // Смена года может увести на будущий месяц — прижимаем к текущему.
+    setCursor({
+      year,
+      month: isFutureMonth(year, month) ? currentMonth : month,
+    });
+  };
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
@@ -137,37 +228,66 @@ export function DateRangePicker({ from, to, onApply, onClose }: DateRangePickerP
             <CircleButton icon="close" label="Close" glyphSize={13} onPress={onClose} />
           </View>
 
-          <View
+          {/* Месяц выбирается прямо тут, а не перелистыванием: до прошлой
+              зимы стрелкой пришлось бы жать десяток раз. */}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Choose month and year"
+            accessibilityState={{ expanded: pickingMonth }}
+            onPress={() => setPickingMonth((current) => !current)}
             style={{
               flexDirection: "row",
               alignItems: "center",
-              justifyContent: "space-between",
+              gap: 6,
+              alignSelf: "flex-start",
               marginTop: spacing.lg,
+              paddingVertical: 2,
             }}
           >
-            <CircleButton
-              icon="chevronLeft"
-              label="Previous month"
-              glyphSize={15}
-              onPress={() => shiftMonth(-1)}
-            />
             <Text style={[typography.headline, { color: colors.text }]}>
               {MONTHS_LONG[cursor.month]} {cursor.year}
             </Text>
-            {canGoForward ? (
-              <CircleButton
-                icon="chevronRight"
-                label="Next month"
-                glyphSize={15}
-                onPress={() => shiftMonth(1)}
-              />
-            ) : (
-              // Место под кнопкой держим всегда: иначе название месяца
-              // прыгает вбок на текущем месяце.
-              <View style={{ width: 34, height: 34 }} />
-            )}
-          </View>
+            <Icon name="chevronDown" size={11} color={colors.textSecondary} />
+          </Pressable>
 
+          {pickingMonth ? (
+            <>
+              <View
+                style={{
+                  flexDirection: "row",
+                  gap: spacing.md,
+                  height: GRID_HEIGHT,
+                  marginTop: spacing.md,
+                }}
+              >
+                <MonthYearColumn
+                  values={MONTHS_LONG.map((name, month) => ({
+                    key: name,
+                    label: name,
+                    selected: month === cursor.month,
+                    disabled: isFutureMonth(cursor.year, month),
+                    onPress: () => moveCursor(cursor.year, month),
+                  }))}
+                />
+                <MonthYearColumn
+                  values={years.map((year) => ({
+                    key: String(year),
+                    label: String(year),
+                    selected: year === cursor.year,
+                    disabled: false,
+                    onPress: () => moveCursor(year, cursor.month),
+                  }))}
+                />
+              </View>
+
+              <Button
+                label="Done"
+                onPress={() => setPickingMonth(false)}
+                style={{ marginTop: spacing.lg }}
+              />
+            </>
+          ) : (
+            <>
           <View style={{ flexDirection: "row", marginTop: spacing.md }}>
             {WEEKDAYS.map((day, index) => (
               <Text
@@ -221,10 +341,13 @@ export function DateRangePicker({ from, to, onApply, onClose }: DateRangePickerP
                       borderRadius: radius.pill,
                       alignItems: "center",
                       justifyContent: "center",
+                      // Диапазон подсвечен нейтральным тёплым тоном, а не
+                      // зелёным: зелёный в макете значит «хорошо с деньгами»,
+                      // и на выборе дат он читался бы как оценка.
                       backgroundColor: edge
                         ? colors.surfaceInverse
                         : inRange
-                          ? colors.positiveSurface
+                          ? colors.trackRing
                           : "transparent",
                     }}
                   >
@@ -236,9 +359,7 @@ export function DateRangePicker({ from, to, onApply, onClose }: DateRangePickerP
                             ? colors.textInverse
                             : future
                               ? colors.textFaint
-                              : inRange
-                                ? colors.positiveTextStrong
-                                : colors.text,
+                              : colors.text,
                         },
                       ]}
                     >
@@ -271,6 +392,8 @@ export function DateRangePicker({ from, to, onApply, onClose }: DateRangePickerP
             }}
             style={{ marginTop: spacing.lg }}
           />
+            </>
+          )}
         </View>
       </View>
     </Modal>

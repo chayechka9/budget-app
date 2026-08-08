@@ -24,10 +24,23 @@ export type MenuAnchor = {
   left: number;
 };
 
+/** Пункт плоского меню. `selection: null` — «Custom range…»: открывает календарь. */
+export type PeriodOption = {
+  label: string;
+  selection: PeriodSelection | null;
+};
+
 type PeriodMenuProps = {
   visible: boolean;
   value: PeriodSelection;
   anchor: MenuAnchor;
+  /**
+   * Плоский список пунктов — без заголовков и разделителей.
+   *
+   * Без него меню показывает полный набор с разделами «By month» / «By week»:
+   * так его открывает карточка накоплений, где выбор шире.
+   */
+  options?: PeriodOption[];
   onSelect: (selection: PeriodSelection) => void;
   /** Открыть выбор произвольного диапазона. */
   onCustom: () => void;
@@ -42,11 +55,14 @@ type PeriodMenuProps = {
 };
 
 /**
- * Во что примерно разворачивается список — два раздела по четыре пункта
- * плюс Custom. Точную высоту знать неоткуда: решение «вниз или вверх»
- * принимается до того, как меню отрисовано и его можно измерить.
+ * Во что примерно разворачивается список. Точную высоту знать неоткуда:
+ * решение «вниз или вверх» принимается до того, как меню отрисовано и его
+ * можно измерить, поэтому складываем её из размеров строк.
  */
-const ESTIMATED_HEIGHT = 396;
+const ROW_HEIGHT = 40;
+const SECTION_HEIGHT = 36;
+const DIVIDER_HEIGHT = 13;
+const LIST_PADDING = 12;
 
 /** Зазор до края экрана, чтобы меню не липло к нему вплотную. */
 const SCREEN_MARGIN = 16;
@@ -57,6 +73,15 @@ function isActive(
   count: number,
 ): boolean {
   return value.kind === "preset" && value.unit === unit && value.count === count;
+}
+
+/** Выбран ли пункт плоского списка. */
+function isOptionActive(value: PeriodSelection, option: PeriodOption): boolean {
+  if (option.selection === null) return value.kind === "custom";
+  if (option.selection.kind !== "preset" || value.kind !== "preset") return false;
+  return (
+    value.unit === option.selection.unit && value.count === option.selection.count
+  );
 }
 
 function Section({ title }: { title: string }) {
@@ -121,6 +146,7 @@ export function PeriodMenu({
   visible,
   value,
   anchor,
+  options,
   onSelect,
   onCustom,
   onClose,
@@ -128,9 +154,16 @@ export function PeriodMenu({
 }: PeriodMenuProps) {
   const screenHeight = Dimensions.get("window").height;
 
+  const estimatedHeight = options
+    ? options.length * ROW_HEIGHT + LIST_PADDING
+    : 2 * SECTION_HEIGHT +
+      (MONTH_PRESETS.length + WEEK_PRESETS.length + 1) * ROW_HEIGHT +
+      DIVIDER_HEIGHT +
+      LIST_PADDING;
+
   // Подпись периода есть и на нижней карточке: там места под ней не хватает,
   // и меню разворачивается вверх, а не уезжает за край экрана.
-  const flip = anchor.top + ESTIMATED_HEIGHT > screenHeight - SCREEN_MARGIN;
+  const flip = anchor.top + estimatedHeight > screenHeight - SCREEN_MARGIN;
 
   const placement = flip
     ? {
@@ -170,44 +203,59 @@ export function PeriodMenu({
           }}
         >
           <ScrollView contentContainerStyle={{ padding: 6 }}>
-            <Section title="By month" />
-            {MONTH_PRESETS.map((preset) => (
-              <Row
-                key={preset.id}
-                label={preset.label}
-                active={isActive(value, "month", preset.count)}
-                onPress={() =>
-                  onSelect({ kind: "preset", unit: "month", count: preset.count })
-                }
-              />
-            ))}
+            {options ? (
+              options.map((option) => (
+                <Row
+                  key={option.label}
+                  label={option.label}
+                  active={isOptionActive(value, option)}
+                  onPress={() =>
+                    option.selection === null ? onCustom() : onSelect(option.selection)
+                  }
+                />
+              ))
+            ) : (
+              <>
+                <Section title="By month" />
+                {MONTH_PRESETS.map((preset) => (
+                  <Row
+                    key={preset.id}
+                    label={preset.label}
+                    active={isActive(value, "month", preset.count)}
+                    onPress={() =>
+                      onSelect({ kind: "preset", unit: "month", count: preset.count })
+                    }
+                  />
+                ))}
 
-            <Section title="By week" />
-            {WEEK_PRESETS.map((preset) => (
-              <Row
-                key={preset.id}
-                label={preset.label}
-                active={isActive(value, "week", preset.count)}
-                onPress={() =>
-                  onSelect({ kind: "preset", unit: "week", count: preset.count })
-                }
-              />
-            ))}
+                <Section title="By week" />
+                {WEEK_PRESETS.map((preset) => (
+                  <Row
+                    key={preset.id}
+                    label={preset.label}
+                    active={isActive(value, "week", preset.count)}
+                    onPress={() =>
+                      onSelect({ kind: "preset", unit: "week", count: preset.count })
+                    }
+                  />
+                ))}
 
-            <View
-              style={{
-                height: 1,
-                marginVertical: 6,
-                marginHorizontal: 14,
-                backgroundColor: colors.separator,
-              }}
-            />
+                <View
+                  style={{
+                    height: 1,
+                    marginVertical: 6,
+                    marginHorizontal: 14,
+                    backgroundColor: colors.separator,
+                  }}
+                />
 
-            <Row
-              label="Custom range…"
-              active={value.kind === "custom"}
-              onPress={onCustom}
-            />
+                <Row
+                  label="Custom range…"
+                  active={value.kind === "custom"}
+                  onPress={onCustom}
+                />
+              </>
+            )}
           </ScrollView>
         </View>
       </Pressable>

@@ -12,7 +12,11 @@ import {
   SavingsChart,
   SpendingBars,
 } from "../../components/InsightsCharts";
-import { PeriodMenu, type MenuAnchor } from "../../components/PeriodMenu";
+import {
+  PeriodMenu,
+  type MenuAnchor,
+  type PeriodOption,
+} from "../../components/PeriodMenu";
 import { colors, radius, spacing, typography } from "../../constants/theme";
 import {
   DEFAULT_PERIOD,
@@ -30,6 +34,28 @@ import { useStore } from "../../lib/store";
 
 /** Сколько категорий показывать в разбивке по нажатому столбику. */
 const BREAKDOWN_LIMIT = 3;
+
+/**
+ * Меню периода у «Spending by month»: два пресета и произвольный диапазон.
+ *
+ * Недель тут нет намеренно — карточка про помесячный ритм трат, а недельная
+ * разбивка за полгода превращает её в частокол. Полный набор остался у
+ * накоплений, где длинный ряд точек читается.
+ */
+const SPENDING_PRESET_COUNTS = [3, 6];
+
+const SPENDING_PERIOD_OPTIONS: PeriodOption[] = [
+  ...MONTH_PRESETS.filter((preset) => SPENDING_PRESET_COUNTS.includes(preset.count)).map(
+    (preset) => ({
+      label: preset.label,
+      selection: { kind: "preset", unit: "month", count: preset.count } as const,
+    }),
+  ),
+  { label: "Custom range…", selection: null },
+];
+
+/** Какая из карточек открыла меню периода — у них независимые периоды. */
+type PeriodTarget = "spending" | "overview";
 
 /**
  * Подпись периода — она же кнопка меню. Стоит на обеих карточках, где период
@@ -122,12 +148,19 @@ export default function InsightsScreen() {
   const insets = useSafeAreaInsets();
   const { transactions, categories } = useStore();
 
-  const [period, setPeriod] = useState<PeriodSelection>(DEFAULT_PERIOD);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [customOpen, setCustomOpen] = useState(false);
+  // У «Spending by month» свой период, у двух нижних карточек — общий.
+  // Разные вопросы: «куда уходили деньги в последние месяцы» и «как идут
+  // дела в целом» разглядывают на разной глубине, и один переключатель на
+  // всех заставлял бы переставлять его туда-обратно.
+  const [spendingPeriod, setSpendingPeriod] = useState<PeriodSelection>(DEFAULT_PERIOD);
+  const [overviewPeriod, setOverviewPeriod] = useState<PeriodSelection>(DEFAULT_PERIOD);
+
+  /** Какая карточка сейчас выбирает период; null — меню закрыто. */
+  const [menuTarget, setMenuTarget] = useState<PeriodTarget | null>(null);
+  const [customTarget, setCustomTarget] = useState<PeriodTarget | null>(null);
   // «Custom range…» выбран, но меню ещё закрывается — календарь ждёт своей
   // очереди, иначе iOS проглотит его показ.
-  const [customPending, setCustomPending] = useState(false);
+  const [customPending, setCustomPending] = useState<PeriodTarget | null>(null);
   const [anchor, setAnchor] = useState<MenuAnchor>({
     top: 0,
     triggerTop: 0,
@@ -143,13 +176,22 @@ export default function InsightsScreen() {
   const spendPeriodRow = useRef<View>(null);
   const savingsPeriodRow = useRef<View>(null);
 
-  const buckets = useMemo(
-    () => bucketsFor(transactions, period),
-    [transactions, period],
+  const spendBuckets = useMemo(
+    () => bucketsFor(transactions, spendingPeriod),
+    [transactions, spendingPeriod],
   );
-  const unit = useMemo(
-    () => resolveWindow(transactions, period).unit,
-    [transactions, period],
+  const spendUnit = useMemo(
+    () => resolveWindow(transactions, spendingPeriod).unit,
+    [transactions, spendingPeriod],
+  );
+
+  const overviewBuckets = useMemo(
+    () => bucketsFor(transactions, overviewPeriod),
+    [transactions, overviewPeriod],
+  );
+  const overviewUnit = useMemo(
+    () => resolveWindow(transactions, overviewPeriod).unit,
+    [transactions, overviewPeriod],
   );
 
   const totalSaved = categories
@@ -157,22 +199,23 @@ export default function InsightsScreen() {
     .reduce((sum, category) => sum + category.assigned, 0);
 
   const savings = useMemo(
-    () => savingsCurve(transactions, unit, buckets, totalSaved),
-    [transactions, unit, buckets, totalSaved],
+    () => savingsCurve(transactions, overviewUnit, overviewBuckets, totalSaved),
+    [transactions, overviewUnit, overviewBuckets, totalSaved],
   );
 
-  const periodLabel = describeSelection(period, buckets);
-  const unitWord = unit === "week" ? "week" : "month";
+  const spendingLabel = describeSelection(spendingPeriod, spendBuckets);
+  const overviewLabel = describeSelection(overviewPeriod, overviewBuckets);
+  const spendUnitWord = spendUnit === "week" ? "week" : "month";
 
-  const totalSpent = buckets.reduce((sum, bucket) => sum + bucket.spent, 0);
-  const average = buckets.length > 0 ? totalSpent / buckets.length : 0;
-  const netTotal = buckets.reduce((sum, bucket) => sum + bucket.net, 0);
+  const totalSpent = spendBuckets.reduce((sum, bucket) => sum + bucket.spent, 0);
+  const average = spendBuckets.length > 0 ? totalSpent / spendBuckets.length : 0;
+  const netTotal = overviewBuckets.reduce((sum, bucket) => sum + bucket.net, 0);
 
-  const findBucket = (key: string | null): Bucket | null =>
-    key === null ? null : (buckets.find((bucket) => bucket.key === key) ?? null);
+  const findBucket = (list: Bucket[], key: string | null): Bucket | null =>
+    key === null ? null : (list.find((bucket) => bucket.key === key) ?? null);
 
-  const spendBucket = findBucket(spendKey);
-  const flowBucket = findBucket(flowKey);
+  const spendBucket = findBucket(spendBuckets, spendKey);
+  const flowBucket = findBucket(overviewBuckets, flowKey);
 
   const breakdown = useMemo(
     () =>
@@ -189,18 +232,23 @@ export default function InsightsScreen() {
   const savedDelta =
     savings.length > 1 ? savings[savings.length - 1] - savings[0] : 0;
 
-  const applyPeriod = (next: PeriodSelection) => {
-    setPeriod(next);
-    setSpendKey(null);
-    setFlowKey(null);
-    setSavIndex(null);
-    setMenuOpen(false);
+  const applyPeriod = (target: PeriodTarget, next: PeriodSelection) => {
+    if (target === "spending") {
+      setSpendingPeriod(next);
+      // Выделенный столбик сбрасываем: за новый период его корзины уже нет.
+      setSpendKey(null);
+    } else {
+      setOverviewPeriod(next);
+      setFlowKey(null);
+      setSavIndex(null);
+    }
+    setMenuTarget(null);
   };
 
-  const openMenu = (row: React.RefObject<View | null>) => {
+  const openMenu = (target: PeriodTarget, row: React.RefObject<View | null>) => {
     row.current?.measureInWindow((x, y, _width, height) => {
       setAnchor({ top: y + height + 6, triggerTop: y, left: x });
-      setMenuOpen(true);
+      setMenuTarget(target);
     });
   };
 
@@ -211,7 +259,12 @@ export default function InsightsScreen() {
   ) => set(current === key ? null : key);
 
   const spendDiff = spendBucket ? spendBucket.spent - average : 0;
-  const customWindow = resolveWindow(transactions, period);
+
+  // Календарь открывается на том диапазоне, который у карточки сейчас.
+  const customWindow = resolveWindow(
+    transactions,
+    customTarget === "spending" ? spendingPeriod : overviewPeriod,
+  );
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -223,10 +276,12 @@ export default function InsightsScreen() {
         }}
       >
         <Text style={[typography.screenTitle, { color: colors.text }]}>Insights</Text>
+        {/* Подпись под заголовком относится к карточке прямо под ней —
+            у накоплений период свой и подписан на самой карточке. */}
         <Text
           style={[typography.caption, { color: colors.textSecondary, marginTop: 3 }]}
         >
-          {periodLabel}
+          {spendingLabel}
         </Text>
 
         {/* ── Траты по периодам ── */}
@@ -239,63 +294,26 @@ export default function InsightsScreen() {
             }}
           >
             <Text style={[typography.headline, { color: colors.text }]}>
-              Spending by {unitWord}
+              Spending by {spendUnitWord}
             </Text>
             <Text style={[typography.caption, { color: colors.textSecondary }]}>
               avg {formatMoneyShort(average)}
             </Text>
           </View>
 
+          {/* Период выбирается только отсюда: ряд пресетов рядом с этой же
+              подписью дублировал бы один и тот же выбор двумя контролами. */}
           <View style={{ marginTop: 2 }}>
             <PeriodButton
-              label={periodLabel}
+              label={spendingLabel}
               innerRef={spendPeriodRow}
-              onPress={() => openMenu(spendPeriodRow)}
+              onPress={() => openMenu("spending", spendPeriodRow)}
             />
-          </View>
-
-          {/* Пресеты по месяцам под рукой: это самый частый выбор, ради него
-              не стоит каждый раз открывать меню. Остальное — в меню выше. */}
-          <View style={{ flexDirection: "row", gap: 6, marginTop: spacing.md }}>
-            {MONTH_PRESETS.map((preset) => {
-              const active =
-                period.kind === "preset" &&
-                period.unit === "month" &&
-                period.count === preset.count;
-              return (
-                <Pressable
-                  key={preset.id}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: active }}
-                  onPress={() =>
-                    applyPeriod({ kind: "preset", unit: "month", count: preset.count })
-                  }
-                  style={{
-                    paddingVertical: 6,
-                    paddingHorizontal: 12,
-                    borderRadius: radius.pill,
-                    backgroundColor: active ? colors.surfaceInverse : colors.surfaceField,
-                  }}
-                >
-                  <Text
-                    style={[
-                      typography.segmentLabel,
-                      {
-                        fontSize: 12,
-                        color: active ? colors.textInverse : colors.textSecondary,
-                      },
-                    ]}
-                  >
-                    {preset.short}
-                  </Text>
-                </Pressable>
-              );
-            })}
           </View>
 
           <View style={{ marginTop: spacing.lg }}>
             <SpendingBars
-              buckets={buckets}
+              buckets={spendBuckets}
               selectedKey={spendKey}
               onSelect={(key) => toggle(key, spendKey, setSpendKey)}
             />
@@ -307,8 +325,8 @@ export default function InsightsScreen() {
               { color: colors.textSecondary, marginTop: spacing.md },
             ]}
           >
-            {formatMoney(totalSpent)} over {buckets.length}{" "}
-            {buckets.length === 1 ? unitWord : `${unitWord}s`}
+            {formatMoney(totalSpent)} over {spendBuckets.length}{" "}
+            {spendBuckets.length === 1 ? spendUnitWord : `${spendUnitWord}s`}
           </Text>
 
           {spendBucket ? (
@@ -347,7 +365,7 @@ export default function InsightsScreen() {
               <View style={{ marginTop: 10, gap: 6 }}>
                 {breakdown.length === 0 ? (
                   <Text style={[typography.caption, { color: colors.textSecondary }]}>
-                    Nothing spent in this {unitWord}.
+                    Nothing spent in this {spendUnitWord}.
                   </Text>
                 ) : (
                   breakdown.map((item) => (
@@ -387,7 +405,7 @@ export default function InsightsScreen() {
 
           <View style={{ marginTop: 18 }}>
             <IncomeExpenseBars
-              buckets={buckets}
+              buckets={overviewBuckets}
               selectedKey={flowKey}
               onSelect={(key) => toggle(key, flowKey, setFlowKey)}
             />
@@ -441,9 +459,9 @@ export default function InsightsScreen() {
 
           <View style={{ marginTop: 2 }}>
             <PeriodButton
-              label={periodLabel}
+              label={overviewLabel}
               innerRef={savingsPeriodRow}
-              onPress={() => openMenu(savingsPeriodRow)}
+              onPress={() => openMenu("overview", savingsPeriodRow)}
             />
           </View>
 
@@ -451,7 +469,7 @@ export default function InsightsScreen() {
             {formatMoney(savings[savActive] ?? totalSaved)}
           </Text>
           <Text style={[typography.captionSmall, { color: colors.textTertiary }]}>
-            {buckets[savActive]?.label ?? ""}
+            {overviewBuckets[savActive]?.label ?? ""}
           </Text>
 
           <View style={{ marginTop: 10 }}>
@@ -459,37 +477,39 @@ export default function InsightsScreen() {
           </View>
 
           <View style={{ marginTop: spacing.sm }}>
-            <ChartAxis buckets={buckets} activeIndex={savActive} />
+            <ChartAxis buckets={overviewBuckets} activeIndex={savActive} />
           </View>
         </Card>
       </ScrollView>
 
       <PeriodMenu
-        visible={menuOpen}
-        value={period}
+        visible={menuTarget !== null}
+        value={menuTarget === "spending" ? spendingPeriod : overviewPeriod}
         anchor={anchor}
-        onSelect={applyPeriod}
+        // У трат — короткий плоский список, у накоплений остаётся полный.
+        options={menuTarget === "spending" ? SPENDING_PERIOD_OPTIONS : undefined}
+        onSelect={(next) => applyPeriod(menuTarget ?? "overview", next)}
         onCustom={() => {
-          setCustomPending(true);
-          setMenuOpen(false);
+          setCustomPending(menuTarget);
+          setMenuTarget(null);
         }}
-        onClose={() => setMenuOpen(false)}
+        onClose={() => setMenuTarget(null)}
         onDismissed={() => {
-          if (!customPending) return;
-          setCustomPending(false);
-          setCustomOpen(true);
+          if (customPending === null) return;
+          setCustomTarget(customPending);
+          setCustomPending(null);
         }}
       />
 
-      {customOpen ? (
+      {customTarget !== null ? (
         <DateRangePicker
           from={customWindow.from}
           to={customWindow.to}
           onApply={(from, to) => {
-            applyPeriod({ kind: "custom", from, to });
-            setCustomOpen(false);
+            applyPeriod(customTarget, { kind: "custom", from, to });
+            setCustomTarget(null);
           }}
-          onClose={() => setCustomOpen(false)}
+          onClose={() => setCustomTarget(null)}
         />
       ) : null}
     </View>

@@ -17,7 +17,14 @@ import { formatMoneyShort } from "../lib/mock-data";
 const FIT_LIMIT = 6;
 
 const BAR_GAP = 6;
-const BAR_MAX_HEIGHT = 84;
+
+/**
+ * Столбики трат заметно выше, чем в компактном Income vs Expenses: это
+ * главный график экрана, и разница между месяцами по нему должна читаться
+ * без вглядывания. Высота области — столбик плюс две строки подписей.
+ */
+const SPEND_BAR_MAX_HEIGHT = 150;
+const SPEND_CHART_HEIGHT = 196;
 
 /** Ширина столбика в режиме прокрутки — на год колонки ужимаются. */
 function columnWidth(count: number): number {
@@ -113,7 +120,7 @@ export function SpendingBars({ buckets, selectedKey, onSelect }: BarsProps) {
   const showValues = buckets.length <= FIT_LIMIT;
 
   return (
-    <ChartScroller scroll={scroll} height={130}>
+    <ChartScroller scroll={scroll} height={SPEND_CHART_HEIGHT}>
       {buckets.map((bucket, index) => {
         const selected = bucket.key === selectedKey;
         return (
@@ -135,7 +142,7 @@ export function SpendingBars({ buckets, selectedKey, onSelect }: BarsProps) {
             <View
               style={{
                 width: "100%",
-                height: Math.max(4, (bucket.spent / max) * BAR_MAX_HEIGHT),
+                height: Math.max(4, (bucket.spent / max) * SPEND_BAR_MAX_HEIGHT),
                 borderTopLeftRadius: 8,
                 borderTopRightRadius: 8,
                 borderBottomLeftRadius: 4,
