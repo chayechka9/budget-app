@@ -36,23 +36,21 @@ import { useStore } from "../../lib/store";
 const BREAKDOWN_LIMIT = 3;
 
 /**
- * Меню периода у «Spending by month»: два пресета и произвольный диапазон.
+ * Меню периода у «Spending by month»: только три помесячных пресета.
  *
- * Недель тут нет намеренно — карточка про помесячный ритм трат, а недельная
- * разбивка за полгода превращает её в частокол. Полный набор остался у
- * накоплений, где длинный ряд точек читается.
+ * Ни недель, ни произвольного диапазона — карточка отвечает на один вопрос,
+ * «как менялись траты по месяцам», и любая другая нарезка её ломает: за
+ * неделями пропадает месячный ритм, а произвольный отрезок делает соседние
+ * столбики несопоставимыми. Полный набор остался у накоплений.
  */
-const SPENDING_PRESET_COUNTS = [3, 6];
+const SPENDING_PRESET_COUNTS = [3, 6, 12];
 
-const SPENDING_PERIOD_OPTIONS: PeriodOption[] = [
-  ...MONTH_PRESETS.filter((preset) => SPENDING_PRESET_COUNTS.includes(preset.count)).map(
-    (preset) => ({
-      label: preset.label,
-      selection: { kind: "preset", unit: "month", count: preset.count } as const,
-    }),
-  ),
-  { label: "Custom range…", selection: null },
-];
+const SPENDING_PERIOD_OPTIONS: PeriodOption[] = MONTH_PRESETS.filter((preset) =>
+  SPENDING_PRESET_COUNTS.includes(preset.count),
+).map((preset) => ({
+  label: preset.label,
+  selection: { kind: "preset", unit: "month", count: preset.count } as const,
+}));
 
 /** Какая из карточек открыла меню периода — у них независимые периоды. */
 type PeriodTarget = "spending" | "overview";
