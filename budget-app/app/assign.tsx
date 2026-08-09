@@ -29,13 +29,25 @@ function parseAmount(input: string | undefined): number {
   return Number.isFinite(value) ? value : 0;
 }
 
-/** Одинаковая строка шрифта для префикса `€`, цифр и caret. */
+/**
+ * Одинаковые метрики шрифта для префикса `€` и для цифр.
+ *
+ * Ключевое здесь — `lineHeight: undefined`. Оба стиля начинаются со спреда
+ * `typography.amountRow`, а он приносит с собой `lineHeight: 19`, и именно он
+ * разводил € с цифрой по вертикали: на iOS `lineHeight` двигает глиф внутри
+ * line box у `Text`, но к однострочному `TextInput` не применяется вовсе —
+ * там текст центрируется по рамке поля. Две разные схемы выкладки на одной
+ * строке и давали постоянный сдвиг примерно в 1.3 pt.
+ *
+ * По той же причине бесполезно задавать общие `height` + `lineHeight` (так
+ * уже пробовали) и `textAlignVertical`/`includeFontPadding` — обе настройки
+ * android-only. Без `lineHeight` обе коробки живут по метрикам самого шрифта,
+ * и `alignItems: "center"` у контейнера ставит их на одну базовую линию.
+ */
 const ASSIGN_AMOUNT_TEXT_METRICS = {
-  height: 20,
   fontSize: 14.5,
   fontWeight: "700" as const,
-  lineHeight: 20,
-  includeFontPadding: false,
+  lineHeight: undefined,
 };
 
 type AssignRowProps = {
@@ -122,10 +134,7 @@ function AssignRow({ category, value, onChange }: AssignRowProps) {
               ...ASSIGN_AMOUNT_TEXT_METRICS,
               width: 44,
               padding: 0,
-              paddingHorizontal: 0,
-              paddingVertical: 0,
               margin: 0,
-              textAlignVertical: "center",
               color: colors.text,
             },
           ]}
