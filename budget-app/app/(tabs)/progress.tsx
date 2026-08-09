@@ -3,7 +3,6 @@ import { Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Card } from "../../components/Card";
-import { DateRangePicker } from "../../components/DateRangePicker";
 import { Icon } from "../../components/Icon";
 import {
   ChartAxis,
@@ -24,7 +23,6 @@ import {
   bucketsFor,
   categoryBreakdown,
   describeSelection,
-  resolveWindow,
   savingsCurve,
   type Bucket,
   type PeriodSelection,
@@ -36,29 +34,23 @@ import { useStore } from "../../lib/store";
 const BREAKDOWN_LIMIT = 3;
 
 /**
- * Меню периода у «Spending by month»: только три помесячных пресета.
- *
- * Ни недель, ни произвольного диапазона — карточка отвечает на один вопрос,
- * «как менялись траты по месяцам», и любая другая нарезка её ломает: за
- * неделями пропадает месячный ритм, а произвольный отрезок делает соседние
- * столбики несопоставимыми. Полный набор остался у накоплений.
+ * Во всех трёх карточках один короткий набор помесячных периодов. Состояние
+ * выбора у каждой карточки своё.
  */
-const SPENDING_PRESET_COUNTS = [3, 6, 12];
+const INSIGHTS_PRESET_COUNTS = [3, 6, 12];
 
-const SPENDING_PERIOD_OPTIONS: PeriodOption[] = MONTH_PRESETS.filter((preset) =>
-  SPENDING_PRESET_COUNTS.includes(preset.count),
+const INSIGHTS_PERIOD_OPTIONS: PeriodOption[] = MONTH_PRESETS.filter((preset) =>
+  INSIGHTS_PRESET_COUNTS.includes(preset.count),
 ).map((preset) => ({
   label: preset.label,
   selection: { kind: "preset", unit: "month", count: preset.count } as const,
 }));
 
 /** Какая из карточек открыла меню периода — у них независимые периоды. */
-type PeriodTarget = "spending" | "overview";
+type PeriodTarget = "spending" | "flow" | "savings";
 
 /**
- * Подпись периода — она же кнопка меню. Стоит на обеих карточках, где период
- * что-то значит, чтобы не заставлять уезжать к единственному переключателю
- * наверху экрана.
+ * Подпись периода — она же кнопка меню внутри соответствующей карточки.
  */
 function PeriodButton({
   label,
@@ -142,23 +134,25 @@ function DetailRow({
   );
 }
 
+/** Пустой график сохраняет высоту карточки и не добавляет визуального шума. */
+function EmptyState({ label, height }: { label: string; height: number }) {
+  return (
+    <View style={{ height, alignItems: "center", justifyContent: "center" }}>
+      <Text style={[typography.caption, { color: colors.textTertiary }]}>{label}</Text>
+    </View>
+  );
+}
+
 export default function InsightsScreen() {
   const insets = useSafeAreaInsets();
   const { transactions, categories } = useStore();
 
-  // У «Spending by month» свой период, у двух нижних карточек — общий.
-  // Разные вопросы: «куда уходили деньги в последние месяцы» и «как идут
-  // дела в целом» разглядывают на разной глубине, и один переключатель на
-  // всех заставлял бы переставлять его туда-обратно.
   const [spendingPeriod, setSpendingPeriod] = useState<PeriodSelection>(DEFAULT_PERIOD);
-  const [overviewPeriod, setOverviewPeriod] = useState<PeriodSelection>(DEFAULT_PERIOD);
+  const [flowPeriod, setFlowPeriod] = useState<PeriodSelection>(DEFAULT_PERIOD);
+  const [savingsPeriod, setSavingsPeriod] = useState<PeriodSelection>(DEFAULT_PERIOD);
 
   /** Какая карточка сейчас выбирает период; null — меню закрыто. */
   const [menuTarget, setMenuTarget] = useState<PeriodTarget | null>(null);
-  const [customTarget, setCustomTarget] = useState<PeriodTarget | null>(null);
-  // «Custom range…» выбран, но меню ещё закрывается — календарь ждёт своей
-  // очереди, иначе iOS проглотит его показ.
-  const [customPending, setCustomPending] = useState<PeriodTarget | null>(null);
   const [anchor, setAnchor] = useState<MenuAnchor>({
     top: 0,
     triggerTop: 0,
@@ -172,24 +166,20 @@ export default function InsightsScreen() {
   const [savIndex, setSavIndex] = useState<number | null>(null);
 
   const spendPeriodRow = useRef<View>(null);
+  const flowPeriodRow = useRef<View>(null);
   const savingsPeriodRow = useRef<View>(null);
 
   const spendBuckets = useMemo(
     () => bucketsFor(transactions, spendingPeriod),
     [transactions, spendingPeriod],
   );
-  const spendUnit = useMemo(
-    () => resolveWindow(transactions, spendingPeriod).unit,
-    [transactions, spendingPeriod],
+  const flowBuckets = useMemo(
+    () => bucketsFor(transactions, flowPeriod),
+    [transactions, flowPeriod],
   );
-
-  const overviewBuckets = useMemo(
-    () => bucketsFor(transactions, overviewPeriod),
-    [transactions, overviewPeriod],
-  );
-  const overviewUnit = useMemo(
-    () => resolveWindow(transactions, overviewPeriod).unit,
-    [transactions, overviewPeriod],
+  const savingsBuckets = useMemo(
+    () => bucketsFor(transactions, savingsPeriod),
+    [transactions, savingsPeriod],
   );
 
   const totalSaved = categories
@@ -197,23 +187,28 @@ export default function InsightsScreen() {
     .reduce((sum, category) => sum + category.assigned, 0);
 
   const savings = useMemo(
-    () => savingsCurve(transactions, overviewUnit, overviewBuckets, totalSaved),
-    [transactions, overviewUnit, overviewBuckets, totalSaved],
+    () => savingsCurve(transactions, "month", savingsBuckets, totalSaved),
+    [transactions, savingsBuckets, totalSaved],
   );
 
   const spendingLabel = describeSelection(spendingPeriod, spendBuckets);
-  const overviewLabel = describeSelection(overviewPeriod, overviewBuckets);
-  const spendUnitWord = spendUnit === "week" ? "week" : "month";
+  const flowLabel = describeSelection(flowPeriod, flowBuckets);
+  const savingsLabel = describeSelection(savingsPeriod, savingsBuckets);
 
   const totalSpent = spendBuckets.reduce((sum, bucket) => sum + bucket.spent, 0);
   const average = spendBuckets.length > 0 ? totalSpent / spendBuckets.length : 0;
-  const netTotal = overviewBuckets.reduce((sum, bucket) => sum + bucket.net, 0);
+  const netTotal = flowBuckets.reduce((sum, bucket) => sum + bucket.net, 0);
+  const hasSpending = spendBuckets.some((bucket) => bucket.spent > 0);
+  const hasFlow = flowBuckets.some(
+    (bucket) => bucket.income > 0 || bucket.spent > 0,
+  );
+  const hasSavings = totalSaved > 0 && savings.length > 0;
 
   const findBucket = (list: Bucket[], key: string | null): Bucket | null =>
     key === null ? null : (list.find((bucket) => bucket.key === key) ?? null);
 
   const spendBucket = findBucket(spendBuckets, spendKey);
-  const flowBucket = findBucket(overviewBuckets, flowKey);
+  const flowBucket = findBucket(flowBuckets, flowKey);
 
   const breakdown = useMemo(
     () =>
@@ -227,17 +222,18 @@ export default function InsightsScreen() {
     savings.length === 0
       ? 0
       : Math.min(savIndex ?? savings.length - 1, savings.length - 1);
-  const savedDelta =
-    savings.length > 1 ? savings[savings.length - 1] - savings[0] : 0;
+  const savedChange =
+    savActive > 0 ? savings[savActive] - savings[savActive - 1] : 0;
 
   const applyPeriod = (target: PeriodTarget, next: PeriodSelection) => {
     if (target === "spending") {
       setSpendingPeriod(next);
-      // Выделенный столбик сбрасываем: за новый период его корзины уже нет.
       setSpendKey(null);
-    } else {
-      setOverviewPeriod(next);
+    } else if (target === "flow") {
+      setFlowPeriod(next);
       setFlowKey(null);
+    } else {
+      setSavingsPeriod(next);
       setSavIndex(null);
     }
     setMenuTarget(null);
@@ -258,11 +254,12 @@ export default function InsightsScreen() {
 
   const spendDiff = spendBucket ? spendBucket.spent - average : 0;
 
-  // Календарь открывается на том диапазоне, который у карточки сейчас.
-  const customWindow = resolveWindow(
-    transactions,
-    customTarget === "spending" ? spendingPeriod : overviewPeriod,
-  );
+  const menuValue =
+    menuTarget === "flow"
+      ? flowPeriod
+      : menuTarget === "savings"
+        ? savingsPeriod
+        : spendingPeriod;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -274,13 +271,6 @@ export default function InsightsScreen() {
         }}
       >
         <Text style={[typography.screenTitle, { color: colors.text }]}>Insights</Text>
-        {/* Подпись под заголовком относится к карточке прямо под ней —
-            у накоплений период свой и подписан на самой карточке. */}
-        <Text
-          style={[typography.caption, { color: colors.textSecondary, marginTop: 3 }]}
-        >
-          {spendingLabel}
-        </Text>
 
         {/* ── Траты по периодам ── */}
         <Card style={{ marginTop: spacing.xl }}>
@@ -292,11 +282,13 @@ export default function InsightsScreen() {
             }}
           >
             <Text style={[typography.headline, { color: colors.text }]}>
-              Spending by {spendUnitWord}
+              Spending by month
             </Text>
-            <Text style={[typography.caption, { color: colors.textSecondary }]}>
-              avg {formatMoney(average)}
-            </Text>
+            {hasSpending ? (
+              <Text style={[typography.caption, { color: colors.textSecondary }]}>
+                avg {formatMoney(average)}
+              </Text>
+            ) : null}
           </View>
 
           {/* Период выбирается только отсюда: ряд пресетов рядом с этой же
@@ -310,22 +302,16 @@ export default function InsightsScreen() {
           </View>
 
           <View style={{ marginTop: spacing.lg }}>
-            <SpendingBars
-              buckets={spendBuckets}
-              selectedKey={spendKey}
-              onSelect={(key) => toggle(key, spendKey, setSpendKey)}
-            />
+            {hasSpending ? (
+              <SpendingBars
+                buckets={spendBuckets}
+                selectedKey={spendKey}
+                onSelect={(key) => toggle(key, spendKey, setSpendKey)}
+              />
+            ) : (
+              <EmptyState label="No spending" height={196} />
+            )}
           </View>
-
-          <Text
-            style={[
-              typography.caption,
-              { color: colors.textSecondary, marginTop: spacing.md },
-            ]}
-          >
-            {formatMoney(totalSpent)} over {spendBuckets.length}{" "}
-            {spendBuckets.length === 1 ? spendUnitWord : `${spendUnitWord}s`}
-          </Text>
 
           {spendBucket ? (
             <DetailPanel>
@@ -357,13 +343,13 @@ export default function InsightsScreen() {
                   },
                 ]}
               >
-                {formatSignedMoney(spendDiff)} vs average
+                {formatSignedMoney(spendDiff)} vs avg
               </Text>
 
               <View style={{ marginTop: 10, gap: 6 }}>
                 {breakdown.length === 0 ? (
                   <Text style={[typography.caption, { color: colors.textSecondary }]}>
-                    Nothing spent in this {spendUnitWord}.
+                    No spending
                   </Text>
                 ) : (
                   breakdown.map((item) => (
@@ -397,22 +383,36 @@ export default function InsightsScreen() {
                 { color: netTotal >= 0 ? colors.positiveText : colors.text },
               ]}
             >
-              {formatSignedMoney(netTotal)} net
+              {hasFlow ? `${formatSignedMoney(netTotal)} net` : ""}
             </Text>
           </View>
 
-          <View style={{ marginTop: 18 }}>
-            <IncomeExpenseBars
-              buckets={overviewBuckets}
-              selectedKey={flowKey}
-              onSelect={(key) => toggle(key, flowKey, setFlowKey)}
+          <View style={{ marginTop: 2 }}>
+            <PeriodButton
+              label={flowLabel}
+              innerRef={flowPeriodRow}
+              onPress={() => openMenu("flow", flowPeriodRow)}
             />
           </View>
 
-          <View style={{ flexDirection: "row", gap: spacing.lg, marginTop: spacing.md }}>
-            <LegendDot color={colors.positive} label="Income" />
-            <LegendDot color={colors.surfaceInverse} label="Spending" />
+          <View style={{ marginTop: 18 }}>
+            {hasFlow ? (
+              <IncomeExpenseBars
+                buckets={flowBuckets}
+                selectedKey={flowKey}
+                onSelect={(key) => toggle(key, flowKey, setFlowKey)}
+              />
+            ) : (
+              <EmptyState label="No transactions" height={112} />
+            )}
           </View>
+
+          {hasFlow ? (
+            <View style={{ flexDirection: "row", gap: spacing.lg, marginTop: spacing.md }}>
+              <LegendDot color={colors.positive} label="Income" />
+              <LegendDot color={colors.surfaceInverse} label="Spending" />
+            </View>
+          ) : null}
 
           {flowBucket ? (
             <DetailPanel>
@@ -421,7 +421,7 @@ export default function InsightsScreen() {
               </Text>
               <View style={{ marginTop: 10, gap: 6 }}>
                 <DetailRow name="Income" amount={formatMoney(flowBucket.income)} />
-                <DetailRow name="Expenses" amount={formatMoney(flowBucket.spent)} />
+                <DetailRow name="Spending" amount={formatMoney(flowBucket.spent)} />
                 <DetailRow
                   topBorder
                   strong
@@ -445,71 +445,60 @@ export default function InsightsScreen() {
             <Text style={[typography.headline, { color: colors.text }]}>
               Savings growth
             </Text>
-            <Text
-              style={[
-                typography.amountCaption,
-                { color: savedDelta >= 0 ? colors.positiveText : colors.text },
-              ]}
-            >
-              {formatSignedMoney(savedDelta)}
-            </Text>
           </View>
 
           <View style={{ marginTop: 2 }}>
             <PeriodButton
-              label={overviewLabel}
+              label={savingsLabel}
               innerRef={savingsPeriodRow}
-              onPress={() => openMenu("overview", savingsPeriodRow)}
+              onPress={() => openMenu("savings", savingsPeriodRow)}
             />
           </View>
 
-          <Text style={[typography.amount, { color: colors.text, marginTop: 6 }]}>
-            {formatMoney(savings[savActive] ?? totalSaved)}
-          </Text>
-          <Text style={[typography.captionSmall, { color: colors.textTertiary }]}>
-            {overviewBuckets[savActive]?.label ?? ""}
-          </Text>
+          {hasSavings ? (
+            <>
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "baseline",
+                  marginTop: 6,
+                }}
+              >
+                <Text style={[typography.captionSmall, { color: colors.textTertiary }]}>
+                  {savingsBuckets[savActive]?.label ?? ""}
+                </Text>
+                <Text style={[typography.amountCaption, { color: colors.textSecondary }]}>
+                  Change {formatSignedMoney(savedChange)}
+                </Text>
+              </View>
+              <Text style={[typography.amount, { color: colors.text }]}>
+                {formatMoney(savings[savActive])}
+              </Text>
 
-          <View style={{ marginTop: 10 }}>
-            <SavingsChart values={savings} index={savActive} onScrub={setSavIndex} />
-          </View>
+              <View style={{ marginTop: 10 }}>
+                <SavingsChart values={savings} index={savActive} onScrub={setSavIndex} />
+              </View>
 
-          <View style={{ marginTop: spacing.sm }}>
-            <ChartAxis buckets={overviewBuckets} activeIndex={savActive} />
-          </View>
+              <View style={{ marginTop: spacing.sm }}>
+                <ChartAxis buckets={savingsBuckets} activeIndex={savActive} />
+              </View>
+            </>
+          ) : (
+            <EmptyState label="No savings data" height={158} />
+          )}
         </Card>
       </ScrollView>
 
       <PeriodMenu
         visible={menuTarget !== null}
-        value={menuTarget === "spending" ? spendingPeriod : overviewPeriod}
+        value={menuValue}
         anchor={anchor}
-        // У трат — короткий плоский список, у накоплений остаётся полный.
-        options={menuTarget === "spending" ? SPENDING_PERIOD_OPTIONS : undefined}
-        onSelect={(next) => applyPeriod(menuTarget ?? "overview", next)}
-        onCustom={() => {
-          setCustomPending(menuTarget);
-          setMenuTarget(null);
-        }}
+        options={INSIGHTS_PERIOD_OPTIONS}
+        onSelect={(next) => applyPeriod(menuTarget ?? "spending", next)}
+        onCustom={() => undefined}
         onClose={() => setMenuTarget(null)}
-        onDismissed={() => {
-          if (customPending === null) return;
-          setCustomTarget(customPending);
-          setCustomPending(null);
-        }}
       />
-
-      {customTarget !== null ? (
-        <DateRangePicker
-          from={customWindow.from}
-          to={customWindow.to}
-          onApply={(from, to) => {
-            applyPeriod(customTarget, { kind: "custom", from, to });
-            setCustomTarget(null);
-          }}
-          onClose={() => setCustomTarget(null)}
-        />
-      ) : null}
     </View>
   );
 }

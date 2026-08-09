@@ -100,8 +100,9 @@ function Column({
 }
 
 function barColor(bucket: Bucket, selected: boolean): string {
-  if (selected) return colors.positive;
-  return bucket.isCurrent ? colors.surfaceInverse : colors.border;
+  if (bucket.isCurrent) return colors.surfaceInverse;
+  if (selected) return colors.textFaint;
+  return colors.border;
 }
 
 type BarsProps = {
@@ -134,11 +135,7 @@ export function SpendingBars({ buckets, selectedKey, onSelect }: BarsProps) {
                 {
                   width: "100%",
                   textAlign: "center",
-                  color: selected
-                    ? colors.positiveText
-                    : bucket.isCurrent
-                      ? colors.text
-                      : colors.textMuted,
+                  color: selected || bucket.isCurrent ? colors.text : colors.textMuted,
                 },
               ]}
             >
