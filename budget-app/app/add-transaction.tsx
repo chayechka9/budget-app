@@ -1,5 +1,14 @@
-import { useState } from "react";
-import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import {
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+  type LayoutChangeEvent,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+} from "react-native";
 
 import { BottomSheet } from "../components/BottomSheet";
 import { Button } from "../components/Button";
@@ -36,6 +45,260 @@ const SEGMENTS: { value: TransactionType; label: string }[] = [
   { value: "expense", label: "Expense" },
   { value: "income", label: "Income" },
 ];
+
+const CATEGORY_PAGE_SIZE = 11;
+
+type TransactionOption = { name: string; icon: IconName };
+
+/** Один chip без изменений внешнего вида относительно прежнего списка. */
+function OptionChip({
+  option,
+  active,
+  income,
+  accent,
+  onPress,
+}: {
+  option: TransactionOption;
+  active: boolean;
+  income: boolean;
+  accent: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityState={{ selected: active }}
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+        borderRadius: radius.pill,
+        borderWidth: 0.5,
+        borderColor: active ? accent : colors.separator,
+        backgroundColor: active ? accent : colors.surface,
+        paddingHorizontal: 13,
+        paddingVertical: spacing.sm,
+      }}
+    >
+      {income ? null : (
+        <Icon
+          name={option.icon}
+          size={iconSize.xs}
+          color={active ? colors.textInverse : colors.text}
+        />
+      )}
+      <Text
+        style={[
+          typography.amountCaption,
+          { color: active ? colors.textInverse : colors.text },
+        ]}
+      >
+        {option.name}
+      </Text>
+    </Pressable>
+  );
+}
+
+/** Тот же перенос chips внутри обычного списка или отдельной страницы. */
+function OptionCloud({
+  options,
+  selected,
+  income,
+  accent,
+  onSelect,
+  width,
+}: {
+  options: TransactionOption[];
+  selected: TransactionOption | null;
+  income: boolean;
+  accent: string;
+  onSelect: (option: TransactionOption) => void;
+  width?: number;
+}) {
+  return (
+    <View
+      style={{
+        width,
+        flexDirection: "row",
+        flexWrap: "wrap",
+        gap: spacing.sm,
+        justifyContent: "center",
+      }}
+    >
+      {options.map((option, index) => (
+        <OptionChip
+          key={`${option.name}-${index}`}
+          option={option}
+          active={selected?.name === option.name}
+          income={income}
+          accent={accent}
+          onPress={() => onSelect(option)}
+        />
+      ))}
+    </View>
+  );
+}
+
+/**
+ * До 11 категорий сохраняет прежний flex-wrap. Для большего списка добавляет
+ * крайние клоны: [последняя, первая…последняя, первая]. После свайпа на клон
+ * позиция без анимации переносится на его идентичную реальную страницу.
+ */
+function CategoryPicker({
+  options,
+  selected,
+  income,
+  accent,
+  onSelect,
+}: {
+  options: TransactionOption[];
+  selected: TransactionOption | null;
+  income: boolean;
+  accent: string;
+  onSelect: (option: TransactionOption) => void;
+}) {
+  const scroller = useRef<ScrollView>(null);
+  const [pageWidth, setPageWidth] = useState(0);
+  const [positioned, setPositioned] = useState(false);
+  const [activePage, setActivePage] = useState(0);
+
+  const pages: TransactionOption[][] = [];
+  for (let index = 0; index < options.length; index += CATEGORY_PAGE_SIZE) {
+    pages.push(options.slice(index, index + CATEGORY_PAGE_SIZE));
+  }
+
+  const circular = !income && pages.length > 1;
+  const loopPages = circular
+    ? [pages[pages.length - 1], ...pages, pages[0]]
+    : pages;
+
+  useEffect(() => {
+    if (!circular || pageWidth === 0) return;
+
+    setPositioned(false);
+    const frame = requestAnimationFrame(() => {
+      scroller.current?.scrollTo({ x: pageWidth, animated: false });
+      setActivePage(0);
+      requestAnimationFrame(() => setPositioned(true));
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [circular, pageWidth, pages.length]);
+
+  if (!circular) {
+    return (
+      <OptionCloud
+        options={options}
+        selected={selected}
+        income={income}
+        accent={accent}
+        onSelect={onSelect}
+      />
+    );
+  }
+
+  const measure = (event: LayoutChangeEvent) => {
+    const width = event.nativeEvent.layout.width;
+    if (width > 0 && width !== pageWidth) setPageWidth(width);
+  };
+
+  const finishPage = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (pageWidth === 0) return;
+    const physicalPage = Math.round(event.nativeEvent.contentOffset.x / pageWidth);
+
+    if (physicalPage === 0) {
+      scroller.current?.scrollTo({ x: pages.length * pageWidth, animated: false });
+      setActivePage(pages.length - 1);
+    } else if (physicalPage === pages.length + 1) {
+      scroller.current?.scrollTo({ x: pageWidth, animated: false });
+      setActivePage(0);
+    } else {
+      setActivePage(physicalPage - 1);
+    }
+  };
+
+  const showPage = (index: number) => {
+    scroller.current?.scrollTo({ x: (index + 1) * pageWidth, animated: true });
+    setActivePage(index);
+  };
+
+  return (
+    <View onLayout={measure} style={{ width: "100%" }}>
+      {pageWidth === 0 ? (
+        <OptionCloud
+          options={pages[0]}
+          selected={selected}
+          income={false}
+          accent={accent}
+          onSelect={onSelect}
+        />
+      ) : (
+        <ScrollView
+          ref={scroller}
+          horizontal
+          pagingEnabled
+          nestedScrollEnabled
+          directionalLockEnabled
+          decelerationRate="fast"
+          showsHorizontalScrollIndicator={false}
+          onMomentumScrollEnd={finishPage}
+          style={{ opacity: positioned ? 1 : 0 }}
+        >
+          {loopPages.map((page, index) => (
+            <OptionCloud
+              key={
+                index === 0
+                  ? "last-page-clone"
+                  : index === loopPages.length - 1
+                    ? "first-page-clone"
+                    : `page-${index - 1}`
+              }
+              options={page}
+              selected={selected}
+              income={false}
+              accent={accent}
+              onSelect={onSelect}
+              width={pageWidth}
+            />
+          ))}
+        </ScrollView>
+      )}
+
+      {pageWidth > 0 && positioned ? (
+        <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "center",
+            gap: 4,
+            marginTop: 4,
+          }}
+        >
+          {pages.map((_, index) => (
+            <Pressable
+              key={`page-indicator-${index}`}
+              accessibilityRole="button"
+              accessibilityLabel={`Category page ${index + 1} of ${pages.length}`}
+              accessibilityState={{ selected: activePage === index }}
+              onPress={() => showPage(index)}
+              hitSlop={4}
+              style={{ padding: 3 }}
+            >
+              <View
+                style={{
+                  width: activePage === index ? 12 : 5,
+                  height: 5,
+                  borderRadius: radius.pill,
+                  backgroundColor:
+                    activePage === index ? colors.textMuted : colors.separator,
+                }}
+              />
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
+    </View>
+  );
+}
 
 export default function AddTransactionScreen() {
   const close = useCloseScreen();
@@ -128,53 +391,13 @@ export default function AddTransactionScreen() {
         ) : null}
 
         {/* Категории расхода или источники дохода */}
-        <View
-          style={{
-            flexDirection: "row",
-            flexWrap: "wrap",
-            gap: spacing.sm,
-            justifyContent: "center",
-          }}
-        >
-          {options.map((option) => {
-            const active = selected?.name === option.name;
-            return (
-              <Pressable
-                key={option.name}
-                onPress={() => setSelected(option)}
-                accessibilityRole="button"
-                accessibilityState={{ selected: active }}
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: 6,
-                  borderRadius: radius.pill,
-                  borderWidth: 0.5,
-                  borderColor: active ? accent : colors.separator,
-                  backgroundColor: active ? accent : colors.surface,
-                  paddingHorizontal: 13,
-                  paddingVertical: spacing.sm,
-                }}
-              >
-                {isIncome ? null : (
-                  <Icon
-                    name={option.icon}
-                    size={iconSize.xs}
-                    color={active ? colors.textInverse : colors.text}
-                  />
-                )}
-                <Text
-                  style={[
-                    typography.amountCaption,
-                    { color: active ? colors.textInverse : colors.text },
-                  ]}
-                >
-                  {option.name}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
+        <CategoryPicker
+          options={options}
+          selected={selected}
+          income={isIncome}
+          accent={accent}
+          onSelect={setSelected}
+        />
 
         {/* Заметка и дата — в один ряд */}
         <View style={{ flexDirection: "row", gap: spacing.sm, marginTop: 14 }}>
