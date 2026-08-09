@@ -1,4 +1,4 @@
-import { Modal, Pressable, Text, View } from "react-native";
+import { Modal, Pressable, ScrollView, Text, View } from "react-native";
 
 import { colors, radius, spacing, typography } from "../constants/theme";
 import { formatMonthKey } from "../lib/mock-data";
@@ -44,38 +44,42 @@ export function MonthPicker({
             left: anchor.left,
             minWidth: 190,
             maxHeight: 276,
-            padding: 6,
             borderRadius: radius.dropdown,
             backgroundColor: colors.surface,
             boxShadow: "0 8px 30px rgba(0, 0, 0, 0.14)",
           }}
         >
-          {months.map((month) => (
-            <Pressable
-              key={month}
-              accessibilityRole="button"
-              accessibilityState={{ selected: month === value }}
-              onPress={() => onSelect(month)}
-              style={{
-                paddingVertical: 10,
-                paddingHorizontal: 14,
-                borderRadius: 10,
-              }}
-            >
-              <Text
-                style={[
-                  typography.body,
-                  {
-                    color: colors.text,
-                    fontSize: 14,
-                    fontWeight: month === value ? "700" : "500",
-                  },
-                ]}
+          {/* Месяцев больше, чем влезает в 276px, поэтому список прокручивается —
+              как `overflow-y:auto` у выпадающего списка в макете. Без этого
+              нижние месяцы просто обрезались бы и добраться до них было нельзя. */}
+          <ScrollView contentContainerStyle={{ padding: 6 }}>
+            {months.map((month) => (
+              <Pressable
+                key={month}
+                accessibilityRole="button"
+                accessibilityState={{ selected: month === value }}
+                onPress={() => onSelect(month)}
+                style={{
+                  paddingVertical: 10,
+                  paddingHorizontal: 14,
+                  borderRadius: 10,
+                }}
               >
-                {formatMonthKey(month)}
-              </Text>
-            </Pressable>
-          ))}
+                <Text
+                  style={[
+                    typography.body,
+                    {
+                      color: colors.text,
+                      fontSize: 14,
+                      fontWeight: month === value ? "700" : "500",
+                    },
+                  ]}
+                >
+                  {formatMonthKey(month)}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
         </View>
       </Pressable>
     </Modal>

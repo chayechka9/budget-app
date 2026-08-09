@@ -270,6 +270,63 @@ export function transactionsIn<T extends AnalyticsTransaction>(
   );
 }
 
+/** Ключ месяца, в который попадает дата: «2026-08». */
+export function monthKeyOfDate(iso: string): string {
+  return iso.slice(0, 7);
+}
+
+/** Ключ текущего месяца. */
+export function currentMonthKey(): string {
+  return monthKeyOfDate(todayIso());
+}
+
+/**
+ * Непрерывный ряд месяцев от самой ранней транзакции до `lastKey`, от свежих
+ * к старым — список для выбора месяца на Budget.
+ *
+ * Непрерывный, а не «только месяцы, где есть траты»: месяц без единой траты —
+ * такой же ответ на вопрос «что было в этом месяце», и выбрать его должно быть
+ * можно. Иначе пустое состояние недостижимо, а в списке появляются дыры.
+ */
+export function monthKeysTo(
+  transactions: AnalyticsTransaction[],
+  lastKey: string,
+): string[] {
+  const earliest = earliestDate(transactions);
+  const last = parseIsoDate(`${lastKey}-01`);
+  let cursor = parseIsoDate(`${earliest ? monthKeyOfDate(earliest) : lastKey}-01`);
+
+  const keys: string[] = [];
+  while (cursor <= last) {
+    keys.push(monthKeyOfDate(toIsoDate(cursor)));
+    cursor = addMonths(cursor, 1);
+  }
+  return keys.reverse();
+}
+
+/**
+ * Траты месяца по названиям категорий. Суммы положительные, доходы не в счёт.
+ *
+ * Ключ — `category` транзакции, то есть название, а не id: связь транзакции с
+ * категорией в текущей модели именно такая. Переименование категории учитывает
+ * вызывающая сторона через `matchNames`.
+ */
+export function spentByCategoryIn(
+  transactions: AnalyticsTransaction[],
+  monthKey: string,
+): Record<string, number> {
+  const totals: Record<string, number> = {};
+
+  for (const transaction of transactions) {
+    if (transaction.amount >= 0) continue;
+    if (monthKeyOfDate(transaction.date) !== monthKey) continue;
+    totals[transaction.category] =
+      (totals[transaction.category] ?? 0) + Math.abs(transaction.amount);
+  }
+
+  return totals;
+}
+
 export interface CategoryTotal {
   name: string;
   amount: number;

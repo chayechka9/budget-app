@@ -15,6 +15,7 @@ import {
   spacing,
   typography,
 } from "../../constants/theme";
+import { currentMonthKey, monthKeyOfDate } from "../../lib/analytics";
 import { formatDayLabel, formatMoney, formatSignedMoney } from "../../lib/mock-data";
 import { useStore, type ResolvedCategory } from "../../lib/store";
 
@@ -138,10 +139,27 @@ export default function CategoryDetailScreen() {
 
   // Транзакции связаны с категорией по названию — id у них появится вместе
   // с настоящим хранилищем.
-  const history = transactions
+  const matching = transactions
     .filter((transaction) => category.matchNames.includes(transaction.category))
     .slice()
     .sort((a, b) => b.date.localeCompare(a.date));
+
+  const saving = category.kind === "savings";
+
+  // У накопления история — это пополнения, и вопрос к ней всегда «сколько
+  // отложили в этом месяце»: цель живёт дольше месяца, и прошлогодний взнос
+  // не отвечает на него. У обычной категории окно не сужаем — там история
+  // трат осмысленна целиком.
+  const history = saving
+    ? matching.filter(
+        (transaction) => monthKeyOfDate(transaction.date) === currentMonthKey(),
+      )
+    : matching;
+
+  // «Цель есть, но в этом месяце в неё не клали» — а не «тут вообще пусто».
+  const emptyNote = saving
+    ? "No contributions this month."
+    : "Nothing here yet this month.";
 
   return (
     <ModalScreen>
@@ -211,7 +229,7 @@ export default function CategoryDetailScreen() {
         {history.length === 0 ? (
           <View style={{ paddingVertical: 18, paddingHorizontal: spacing.lg }}>
             <Text style={[typography.caption, { color: colors.textTertiary, fontSize: 13.5 }]}>
-              Nothing here yet this month.
+              {emptyNote}
             </Text>
           </View>
         ) : (
