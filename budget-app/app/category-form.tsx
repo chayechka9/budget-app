@@ -10,6 +10,7 @@ import { ModalScreen } from "../components/ModalScreen";
 import { SegmentedControl } from "../components/SegmentedControl";
 import { colors, radius, spacing, typography } from "../constants/theme";
 import type { CategoryKind } from "../lib/mock-data";
+import { isMoneyAmountWithinLimit, limitMoneyInput } from "../lib/money";
 import { useStore, type ResolvedCategory } from "../lib/store";
 import { useCloseScreen } from "../lib/navigation";
 
@@ -127,7 +128,8 @@ export default function CategoryFormScreen() {
   const creatingGroup = groupId === NEW_GROUP;
   // Запятая с цифровой клавиатуры — такой же разделитель, как точка.
   const parsedAmount = Number(amount.replace(",", "."));
-  const amountValid = amount.trim().length > 0 && Number.isFinite(parsedAmount) && parsedAmount >= 0;
+  const amountValid =
+    amount.trim().length > 0 && isMoneyAmountWithinLimit(parsedAmount);
 
   const canSubmit =
     name.trim().length > 0 &&
@@ -201,7 +203,9 @@ export default function CategoryFormScreen() {
         // меняется вместе с типом, чтобы поле не врало.
         label={kind === "fixed" ? "Planned per month, €" : "Savings goal, €"}
         value={amount}
-        onChangeText={setAmount}
+        onChangeText={(next) =>
+          setAmount((current) => limitMoneyInput(next, current))
+        }
         placeholder="0"
         keyboardType="decimal-pad"
         containerStyle={{ marginTop: spacing.lg }}

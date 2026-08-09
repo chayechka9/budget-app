@@ -14,6 +14,7 @@ import {
   typography,
 } from "../constants/theme";
 import { formatMoney } from "../lib/mock-data";
+import { limitMoneyInput } from "../lib/money";
 import { useStore, type ResolvedCategory } from "../lib/store";
 import { useCloseScreen } from "../lib/navigation";
 
@@ -121,7 +122,9 @@ function AssignRow({ category, value, onChange }: AssignRowProps) {
         <TextInput
           ref={input}
           value={value}
-          onChangeText={(next) => onChange(sanitizeAmount(next))}
+          onChangeText={(next) =>
+            onChange(limitMoneyInput(sanitizeAmount(next), value))
+          }
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           keyboardType="decimal-pad"

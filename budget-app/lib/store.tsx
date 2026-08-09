@@ -17,6 +17,7 @@ import {
   type MockCategory,
   type MockTransaction,
 } from "./mock-data";
+import { isMoneyAmountWithinLimit } from "./money";
 
 /**
  * Временное хранилище в памяти.
@@ -213,6 +214,7 @@ export function StoreProvider({ children }: PropsWithChildren) {
       totalBalance: MOCK_SUMMARY.totalBalance + balanceDelta,
       readyToAssign: MOCK_SUMMARY.readyToAssign + incomeDelta - assignedTotal,
       addTransaction: (input) => {
+        if (!isMoneyAmountWithinLimit(input.amount) || input.amount <= 0) return;
         const signedAmount = input.type === "income" ? input.amount : -input.amount;
         setAdded((current) => [
           {
@@ -233,13 +235,14 @@ export function StoreProvider({ children }: PropsWithChildren) {
         setAssignedByCategory((current) => {
           const next = { ...current };
           for (const [categoryId, amount] of Object.entries(amountByCategoryId)) {
-            if (!amount) continue;
+            if (!isMoneyAmountWithinLimit(amount) || amount <= 0) continue;
             next[categoryId] = (next[categoryId] ?? 0) + amount;
           }
           return next;
         });
       },
       addCategory: (draft) => {
+        if (!isMoneyAmountWithinLimit(draft.amount)) return;
         const groupId = resolveGroupId(draft, setExtraGroups);
         setExtraCategories((current) => [
           ...current,
@@ -258,6 +261,7 @@ export function StoreProvider({ children }: PropsWithChildren) {
         ]);
       },
       updateCategory: (id, draft) => {
+        if (!isMoneyAmountWithinLimit(draft.amount)) return;
         const groupId = resolveGroupId(draft, setExtraGroups);
         setEdits((current) => ({
           ...current,

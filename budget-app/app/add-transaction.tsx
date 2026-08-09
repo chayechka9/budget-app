@@ -8,6 +8,7 @@ import { NumericKeypad, type KeypadKey } from "../components/NumericKeypad";
 import { SegmentedControl } from "../components/SegmentedControl";
 import { colors, iconSize, radius, spacing, typography } from "../constants/theme";
 import { formatMoney, MOCK_INCOME_SOURCES } from "../lib/mock-data";
+import { isMoneyAmountWithinLimit, limitMoneyInput } from "../lib/money";
 import { useStore, type TransactionType } from "../lib/store";
 import { useCloseScreen } from "../lib/navigation";
 
@@ -27,8 +28,8 @@ function applyKey(amount: string, key: KeypadKey): string {
   const [, fraction] = amount.split(".");
   if (fraction !== undefined && fraction.length >= 2) return amount;
   // Ведущий ноль заменяем первой значащей цифрой.
-  if (amount === "0") return key;
-  return amount + key;
+  const next = amount === "0" ? key : amount + key;
+  return limitMoneyInput(next, amount);
 }
 
 const SEGMENTS: { value: TransactionType; label: string }[] = [
@@ -56,7 +57,12 @@ export default function AddTransactionScreen() {
     ? MOCK_INCOME_SOURCES
     : categories.map((category) => ({ name: category.name, icon: category.icon }));
 
-  const canSave = amount.trim().length > 0 && Number(amount) > 0 && selected !== null;
+  const parsedAmount = Number(amount);
+  const canSave =
+    amount.trim().length > 0 &&
+    parsedAmount > 0 &&
+    isMoneyAmountWithinLimit(parsedAmount) &&
+    selected !== null;
   const isToday = date === today();
 
   /** Смена режима сбрасывает выбор: категории и источники не взаимозаменяемы. */
@@ -70,7 +76,7 @@ export default function AddTransactionScreen() {
     if (!canSave || !selected) return;
     addTransaction({
       type,
-      amount: Number(amount),
+      amount: parsedAmount,
       label: selected.name,
       icon: selected.icon,
       note,
