@@ -39,6 +39,12 @@ type AssignRowProps = {
 /** Строка категории с полем «+€»: слева что уже есть, справа сколько добавить. */
 function AssignRow({ category, value, onChange }: AssignRowProps) {
   const input = useRef<TextInput>(null);
+  const [focused, setFocused] = useState(false);
+  // Поле с введённой суммой выглядит иначе, чем пустое: белая подложка и
+  // зелёный «+€» показывают, что в эту категорию уже что-то положили, ещё до
+  // того, как читаешь цифру.
+  const filled = parseAmount(value) > 0;
+
   const current =
     category.kind === "savings"
       ? `${formatMoney(category.assigned)} saved`
@@ -65,35 +71,66 @@ function AssignRow({ category, value, onChange }: AssignRowProps) {
         </Text>
       </View>
 
-      {/* Само поле — 52×19, пальцем в него не попасть. Нажатие по всей плашке
-          переводит фокус в него, а hitSlop добирает высоту до 44. */}
+      {/* Плашка сама по себе — цель 78×44: это и есть область нажатия, отдельный
+          hitSlop ей больше не нужен. Нажатие в любую её точку переводит фокус
+          в поле, поэтому попадать надо по плашке, а не по строке текста. */}
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={`Assign to ${category.name}`}
         onPress={() => input.current?.focus()}
-        hitSlop={{ top: 4, bottom: 4 }}
         style={{
           flexDirection: "row",
           alignItems: "center",
-          gap: 3,
-          paddingHorizontal: 11,
-          paddingVertical: 9,
-          borderRadius: radius.tileSmall,
-          backgroundColor: colors.surfaceField,
+          justifyContent: "center",
+          gap: 2,
+          minWidth: 78,
+          height: 44,
+          borderRadius: radius.field,
+          borderWidth: 1.5,
+          backgroundColor: focused || filled ? colors.surface : colors.surfaceField,
+          borderColor: focused
+            ? colors.positive
+            : filled
+              ? colors.fieldBorderFilled
+              : colors.fieldBorder,
+          // Фокус видно кольцом наружу, а не сменой размера: поле не должно
+          // дёргать соседние строки, когда в него встают.
+          ...(focused
+            ? { boxShadow: `0 0 0 3px ${colors.positiveSurfacePressed}` }
+            : null),
         }}
       >
-        <Text style={[typography.amountRow, { color: colors.textMuted }]}>+€</Text>
+        <Text
+          style={[
+            typography.amountRow,
+            {
+              fontSize: 14.5,
+              fontWeight: "700",
+              color: filled ? colors.positiveText : colors.textMuted,
+            },
+          ]}
+        >
+          +€
+        </Text>
         <TextInput
           ref={input}
           value={value}
           onChangeText={(next) => onChange(sanitizeAmount(next))}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
           keyboardType="decimal-pad"
           inputMode="decimal"
           placeholder="0"
           placeholderTextColor={colors.textFaint}
           style={[
             typography.amountRow,
-            { width: 52, padding: 0, color: colors.text },
+            {
+              width: 44,
+              padding: 0,
+              fontSize: 14.5,
+              fontWeight: "700",
+              color: colors.text,
+            },
           ]}
         />
       </Pressable>
