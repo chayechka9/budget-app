@@ -361,27 +361,32 @@ export const MOCK_SUMMARY = {
   readyToAssign: 314.2,
 };
 
-export function formatMoney(amount: number): string {
-  const formatted = Math.abs(amount).toLocaleString("en-IE", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-  return `${amount < 0 ? "−" : ""}€${formatted}`;
-}
+const MONEY_FALLBACK = "—";
 
 /**
- * Сумма без копеек: «€2,236». Для подписей над столбиками графиков, где
- * копейки не читаются и только удлиняют строку.
+ * Единый пользовательский формат суммы: целые без `.00`, значения с
+ * центами — ровно с двумя знаками. Внутреннее число при этом не меняется.
  */
-export function formatMoneyShort(amount: number): string {
-  const rounded = Math.round(Math.abs(amount));
-  return `${amount < -0.5 ? "−" : ""}€${rounded.toLocaleString("en-IE")}`;
+export function formatMoney(amount: unknown): string {
+  if (typeof amount !== "number" || !Number.isFinite(amount)) return MONEY_FALLBACK;
+
+  const roundedAbsolute = Math.round((Math.abs(amount) + Number.EPSILON) * 100) / 100;
+  const hasCents = !Number.isInteger(roundedAbsolute);
+  const formatted = roundedAbsolute.toLocaleString("en-IE", {
+    minimumFractionDigits: hasCents ? 2 : 0,
+    maximumFractionDigits: 2,
+  });
+
+  return `${amount < 0 && roundedAbsolute !== 0 ? "−" : ""}€${formatted}`;
 }
 
-/** Сумма со знаком: «+€52.10» / «−€41.20» / «€0.00». */
-export function formatSignedMoney(amount: number): string {
-  if (amount > 0.005) return `+${formatMoney(amount)}`;
-  return formatMoney(amount);
+/** Сумма с явным плюсом для положительного ненулевого значения. */
+export function formatSignedMoney(amount: unknown): string {
+  const formatted = formatMoney(amount);
+  if (formatted === MONEY_FALLBACK) return formatted;
+  return typeof amount === "number" && amount > 0 && formatted !== "€0"
+    ? `+${formatted}`
+    : formatted;
 }
 
 /** Заголовок группы дня в Activity: «Today» / «Yesterday» / «2 Aug». */
@@ -439,10 +444,17 @@ function hashId(id: string): number {
  * показывает — выводим из id, чтобы значение было стабильным между рендерами
  * и не «прыгало». Настоящие поля появятся вместе с хранилищем на Stage 1.
  */
-export function transactionTime(id: string): string {
+export function transactionTime(id: unknown): string {
+  if (typeof id !== "string" || id.length === 0) return "—";
+
   const hash = hashId(id);
   const hours = 8 + (hash % 13);
-  const minutes = (hash >> 3) % 60;
+  // `hash` — беззнаковое 32-битное число. Знаковый сдвиг `>>` превращал
+  // значения с установленным старшим битом в отрицательные минуты.
+  const minutes = (hash >>> 3) % 60;
+  if (!Number.isInteger(hours) || hours < 0 || hours > 23) return "—";
+  if (!Number.isInteger(minutes) || minutes < 0 || minutes > 59) return "—";
+
   return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 }
 

@@ -4,7 +4,7 @@ import { Card } from "../components/Card";
 import { Icon } from "../components/Icon";
 import { ModalScreen } from "../components/ModalScreen";
 import { HAIRLINE, colors, radius, spacing, typography } from "../constants/theme";
-import { MOCK_LAST_MONTH, formatMoney } from "../lib/mock-data";
+import { MOCK_LAST_MONTH, formatMoney, formatSignedMoney } from "../lib/mock-data";
 
 /**
  * Итог закрытого месяца. Пока только сводка: выбор, что делать с остатком
@@ -56,7 +56,7 @@ export default function WrappedUpScreen() {
               {item.name}
             </Text>
             <Text style={[typography.amountRow, { color: colors.positiveText }]}>
-              +{formatMoney(item.amount)}
+              {formatSignedMoney(item.amount)}
             </Text>
           </View>
         ))}

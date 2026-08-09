@@ -11,7 +11,7 @@ import Svg, { Circle, Line, Path } from "react-native-svg";
 
 import { colors, radius, typography } from "../constants/theme";
 import { labelStep, type Bucket } from "../lib/analytics";
-import { formatMoneyShort } from "../lib/mock-data";
+import { formatMoney } from "../lib/mock-data";
 
 /** Больше этого числа столбиков в ширину экрана уже не помещается. */
 const FIT_LIMIT = 6;
@@ -126,9 +126,14 @@ export function SpendingBars({ buckets, selectedKey, onSelect }: BarsProps) {
         return (
           <Column key={bucket.key} width={width} onPress={() => onSelect(bucket.key)}>
             <Text
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.65}
               style={[
                 typography.tabLabel,
                 {
+                  width: "100%",
+                  textAlign: "center",
                   color: selected
                     ? colors.positiveText
                     : bucket.isCurrent
@@ -137,7 +142,7 @@ export function SpendingBars({ buckets, selectedKey, onSelect }: BarsProps) {
                 },
               ]}
             >
-              {showValues || selected ? formatMoneyShort(bucket.spent) : ""}
+              {showValues || selected ? formatMoney(bucket.spent) : ""}
             </Text>
             <View
               style={{

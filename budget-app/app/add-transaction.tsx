@@ -7,7 +7,7 @@ import { Icon, type IconName } from "../components/Icon";
 import { NumericKeypad, type KeypadKey } from "../components/NumericKeypad";
 import { SegmentedControl } from "../components/SegmentedControl";
 import { colors, iconSize, radius, spacing, typography } from "../constants/theme";
-import { MOCK_INCOME_SOURCES } from "../lib/mock-data";
+import { formatMoney, MOCK_INCOME_SOURCES } from "../lib/mock-data";
 import { useStore, type TransactionType } from "../lib/store";
 import { useCloseScreen } from "../lib/navigation";
 
@@ -103,7 +103,7 @@ export default function AddTransactionScreen() {
             },
           ]}
         >
-          €{amount || "0"}
+          {selected ? formatMoney(Number(amount || 0)) : `€${amount || "0"}`}
         </Text>
 
         {isIncome ? (

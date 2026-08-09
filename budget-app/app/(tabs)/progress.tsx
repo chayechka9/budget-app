@@ -29,7 +29,7 @@ import {
   type Bucket,
   type PeriodSelection,
 } from "../../lib/analytics";
-import { formatMoney, formatMoneyShort, formatSignedMoney } from "../../lib/mock-data";
+import { formatMoney, formatSignedMoney } from "../../lib/mock-data";
 import { useStore } from "../../lib/store";
 
 /** Сколько категорий показывать в разбивке по нажатому столбику. */
@@ -295,7 +295,7 @@ export default function InsightsScreen() {
               Spending by {spendUnitWord}
             </Text>
             <Text style={[typography.caption, { color: colors.textSecondary }]}>
-              avg {formatMoneyShort(average)}
+              avg {formatMoney(average)}
             </Text>
           </View>
 

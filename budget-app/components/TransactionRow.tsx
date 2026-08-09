@@ -3,7 +3,7 @@ import { Text, View } from "react-native";
 import { colors, spacing, typography } from "../constants/theme";
 import { IconTile } from "./IconTile";
 import type { IconName } from "./Icon";
-import { formatMoney } from "../lib/mock-data";
+import { formatSignedMoney } from "../lib/mock-data";
 
 type TransactionRowProps = {
   icon: IconName;
@@ -49,7 +49,7 @@ export function TransactionRow({
           { color: amount < 0 ? colors.text : colors.positiveText },
         ]}
       >
-        {amount < 0 ? formatMoney(amount) : `+${formatMoney(amount)}`}
+        {formatSignedMoney(amount)}
       </Text>
     </View>
   );

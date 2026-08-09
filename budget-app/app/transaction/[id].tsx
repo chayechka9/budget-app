@@ -7,7 +7,7 @@ import { ModalScreen } from "../../components/ModalScreen";
 import { HAIRLINE, colors, spacing, typography } from "../../constants/theme";
 import {
   formatDayLabel,
-  formatMoney,
+  formatSignedMoney,
   transactionMethod,
   transactionTime,
 } from "../../lib/mock-data";
@@ -88,7 +88,7 @@ export default function TransactionDetailScreen() {
           },
         ]}
       >
-        {income ? `+${formatMoney(transaction.amount)}` : formatMoney(transaction.amount)}
+        {formatSignedMoney(transaction.amount)}
       </Text>
 
       <Card style={{ marginTop: 18, paddingVertical: spacing.sm }}>

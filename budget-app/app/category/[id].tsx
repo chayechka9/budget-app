@@ -15,7 +15,7 @@ import {
   spacing,
   typography,
 } from "../../constants/theme";
-import { formatDayLabel, formatMoney } from "../../lib/mock-data";
+import { formatDayLabel, formatMoney, formatSignedMoney } from "../../lib/mock-data";
 import { useStore, type ResolvedCategory } from "../../lib/store";
 
 /** Сводка по fixed-категории: сколько осталось из плана. */
@@ -254,9 +254,7 @@ export default function CategoryDetailScreen() {
                     },
                   ]}
                 >
-                  {transaction.amount < 0
-                    ? formatMoney(transaction.amount)
-                    : `+${formatMoney(transaction.amount)}`}
+                  {formatSignedMoney(transaction.amount)}
                 </Text>
               </View>
             </CardRow>
