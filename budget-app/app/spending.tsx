@@ -8,15 +8,9 @@ import { ModalScreen } from "../components/ModalScreen";
 import { SegmentedControl } from "../components/SegmentedControl";
 import { TransactionRow } from "../components/TransactionRow";
 import { colors, radius, spacing, typography } from "../constants/theme";
-import {
-  MOCK_LAST_MONTH,
-  dayOfMonth,
-  formatDayLabel,
-  formatMoney,
-  formatSignedMoney,
-  recentDays,
-  type MockTransaction,
-} from "../lib/mock-data";
+import { dayOfMonth, formatDayLabel, recentDays } from "../lib/dates";
+import { MOCK_LAST_MONTH, type MockTransaction } from "../lib/mock-data";
+import { formatMoney, formatSignedMoney } from "../lib/money";
 import { useStore, type ResolvedCategory } from "../lib/store";
 
 type SpendingView = "trend" | "day" | "top";

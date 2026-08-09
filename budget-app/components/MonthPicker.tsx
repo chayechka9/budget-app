@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Modal, Pressable, Text, View } from "react-native";
 
 import { colors, radius, spacing, typography } from "../constants/theme";
-import { MONTHS_SHORT } from "../lib/analytics";
+import { MONTHS_SHORT } from "../lib/dates";
 import { Icon } from "./Icon";
 
 type MonthPickerProps = {

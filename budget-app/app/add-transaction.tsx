@@ -13,11 +13,16 @@ import {
 import { BottomSheet } from "../components/BottomSheet";
 import { Button } from "../components/Button";
 import { Icon, type IconName } from "../components/Icon";
-import { NumericKeypad, type KeypadKey } from "../components/NumericKeypad";
+import { NumericKeypad } from "../components/NumericKeypad";
 import { SegmentedControl } from "../components/SegmentedControl";
 import { colors, iconSize, radius, spacing, typography } from "../constants/theme";
-import { formatMoney, MOCK_INCOME_SOURCES } from "../lib/mock-data";
-import { isMoneyAmountWithinLimit, limitMoneyInput } from "../lib/money";
+import { MOCK_INCOME_SOURCES } from "../lib/mock-data";
+import {
+  appendMoneyKey,
+  formatMoney,
+  isMoneyAmountWithinLimit,
+  parseMoney,
+} from "../lib/money";
 import { useStore, type TransactionType } from "../lib/store";
 import { useCloseScreen } from "../lib/navigation";
 
@@ -27,18 +32,6 @@ function today(): string {
   const month = `${now.getMonth() + 1}`.padStart(2, "0");
   const day = `${now.getDate()}`.padStart(2, "0");
   return `${now.getFullYear()}-${month}-${day}`;
-}
-
-/** Применяет нажатие клавиши к строке суммы. */
-function applyKey(amount: string, key: KeypadKey): string {
-  if (key === "backspace") return amount.slice(0, -1);
-  if (key === ".") return amount.includes(".") ? amount : amount === "" ? "0." : `${amount}.`;
-  // Не даём набрать больше двух знаков после точки.
-  const [, fraction] = amount.split(".");
-  if (fraction !== undefined && fraction.length >= 2) return amount;
-  // Ведущий ноль заменяем первой значащей цифрой.
-  const next = amount === "0" ? key : amount + key;
-  return limitMoneyInput(next, amount);
 }
 
 const SEGMENTS: { value: TransactionType; label: string }[] = [
@@ -320,7 +313,7 @@ export default function AddTransactionScreen() {
     ? MOCK_INCOME_SOURCES
     : categories.map((category) => ({ name: category.name, icon: category.icon }));
 
-  const parsedAmount = Number(amount);
+  const parsedAmount = parseMoney(amount);
   const canSave =
     amount.trim().length > 0 &&
     parsedAmount > 0 &&
@@ -471,7 +464,7 @@ export default function AddTransactionScreen() {
           ]}
         />
       ) : (
-        <NumericKeypad onKey={(key) => setAmount((current) => applyKey(current, key))} />
+        <NumericKeypad onKey={(key) => setAmount((current) => appendMoneyKey(current, key))} />
       )}
 
       <Button

@@ -7,14 +7,7 @@
  */
 
 import type { IconName } from "../components/Icon";
-import {
-  DAY_MS,
-  MONTHS_LONG,
-  MONTHS_SHORT,
-  parseIsoDate,
-  startOfToday,
-  toIsoDate,
-} from "./analytics";
+import { startOfToday } from "./dates";
 
 export type CategoryKind = "fixed" | "savings";
 
@@ -360,76 +353,6 @@ export const MOCK_SUMMARY = {
   /** Ещё не распределено по категориям. */
   readyToAssign: 314.2,
 };
-
-const MONEY_FALLBACK = "—";
-
-/**
- * Единый пользовательский формат суммы: целые без `.00`, значения с
- * центами — ровно с двумя знаками. Внутреннее число при этом не меняется.
- */
-export function formatMoney(amount: unknown): string {
-  if (typeof amount !== "number" || !Number.isFinite(amount)) return MONEY_FALLBACK;
-
-  const roundedAbsolute = Math.round((Math.abs(amount) + Number.EPSILON) * 100) / 100;
-  const hasCents = !Number.isInteger(roundedAbsolute);
-  const formatted = roundedAbsolute.toLocaleString("en-IE", {
-    minimumFractionDigits: hasCents ? 2 : 0,
-    maximumFractionDigits: 2,
-  });
-
-  return `${amount < 0 && roundedAbsolute !== 0 ? "−" : ""}€${formatted}`;
-}
-
-/** Сумма с явным плюсом для положительного ненулевого значения. */
-export function formatSignedMoney(amount: unknown): string {
-  const formatted = formatMoney(amount);
-  if (formatted === MONEY_FALLBACK) return formatted;
-  return typeof amount === "number" && amount > 0 && formatted !== "€0"
-    ? `+${formatted}`
-    : formatted;
-}
-
-/** Заголовок группы дня в Activity: «Today» / «Yesterday» / «2 Aug». */
-export function formatDayLabel(iso: string): string {
-  const date = parseIsoDate(iso);
-  const daysAgo = Math.round((startOfToday().getTime() - date.getTime()) / DAY_MS);
-  if (daysAgo === 0) return "Today";
-  if (daysAgo === 1) return "Yesterday";
-  return `${date.getDate()} ${MONTHS_SHORT[date.getMonth()]}`;
-}
-
-/** Ключ месяца для группировки и фильтров: «2026-08». */
-export function monthKeyOf(iso: string): string {
-  return iso.slice(0, 7);
-}
-
-/** Ключ месяца в подпись: «2026-08» → «August 2026». */
-export function formatMonthKey(key: string): string {
-  const [year, month] = key.split("-").map(Number);
-  return `${MONTHS_LONG[month - 1]} ${year}`;
-}
-
-/** Сколько дней осталось до конца текущего месяца. */
-export function daysLeftInMonth(): number {
-  const now = new Date();
-  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-  return Math.max(0, lastDay - now.getDate());
-}
-
-/** Последние `count` дней, включая сегодня, в виде ISO-строк. */
-export function recentDays(count: number): string[] {
-  const today = startOfToday();
-  const days: string[] = [];
-  for (let offset = count - 1; offset >= 0; offset--) {
-    days.push(toIsoDate(new Date(today.getTime() - offset * DAY_MS)));
-  }
-  return days;
-}
-
-/** Номер дня для подписи под столбиком графика. */
-export function dayOfMonth(iso: string): number {
-  return parseIsoDate(iso).getDate();
-}
 
 function hashId(id: string): number {
   let hash = 0;

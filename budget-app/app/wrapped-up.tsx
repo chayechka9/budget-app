@@ -4,7 +4,8 @@ import { Card } from "../components/Card";
 import { Icon } from "../components/Icon";
 import { ModalScreen } from "../components/ModalScreen";
 import { HAIRLINE, colors, radius, spacing, typography } from "../constants/theme";
-import { MOCK_LAST_MONTH, formatMoney, formatSignedMoney } from "../lib/mock-data";
+import { MOCK_LAST_MONTH } from "../lib/mock-data";
+import { formatMoney, formatSignedMoney } from "../lib/money";
 
 /**
  * Итог закрытого месяца. Пока только сводка: выбор, что делать с остатком

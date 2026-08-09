@@ -10,7 +10,7 @@ import { ModalScreen } from "../components/ModalScreen";
 import { SegmentedControl } from "../components/SegmentedControl";
 import { colors, radius, spacing, typography } from "../constants/theme";
 import type { CategoryKind } from "../lib/mock-data";
-import { isMoneyAmountWithinLimit, limitMoneyInput } from "../lib/money";
+import { isMoneyAmountWithinLimit, sanitizeMoneyInput } from "../lib/money";
 import { useStore, type ResolvedCategory } from "../lib/store";
 import { useCloseScreen } from "../lib/navigation";
 
@@ -204,7 +204,7 @@ export default function CategoryFormScreen() {
         label={kind === "fixed" ? "Planned per month, €" : "Savings goal, €"}
         value={amount}
         onChangeText={(next) =>
-          setAmount((current) => limitMoneyInput(next, current))
+          setAmount((current) => sanitizeMoneyInput(next, current))
         }
         placeholder="0"
         keyboardType="decimal-pad"

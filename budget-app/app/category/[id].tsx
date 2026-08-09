@@ -15,8 +15,8 @@ import {
   spacing,
   typography,
 } from "../../constants/theme";
-import { currentMonthKey, monthKeyOfDate } from "../../lib/analytics";
-import { formatDayLabel, formatMoney, formatSignedMoney } from "../../lib/mock-data";
+import { currentMonthKey, formatDayLabel, monthKeyOf } from "../../lib/dates";
+import { formatMoney, formatSignedMoney } from "../../lib/money";
 import { useStore, type ResolvedCategory } from "../../lib/store";
 
 /** Сводка по fixed-категории: сколько осталось из плана. */
@@ -152,7 +152,7 @@ export default function CategoryDetailScreen() {
   // трат осмысленна целиком.
   const history = saving
     ? matching.filter(
-        (transaction) => monthKeyOfDate(transaction.date) === currentMonthKey(),
+        (transaction) => monthKeyOf(transaction.date) === currentMonthKey(),
       )
     : matching;
 

@@ -11,7 +11,6 @@ import Svg, { Circle, Line, Path } from "react-native-svg";
 
 import { colors, radius, typography } from "../constants/theme";
 import { labelStep, type Bucket } from "../lib/analytics";
-import { formatMoney } from "../lib/mock-data";
 
 /** Больше этого числа столбиков в ширину экрана уже не помещается. */
 const FIT_LIMIT = 6;
@@ -21,10 +20,12 @@ const BAR_GAP = 6;
 /**
  * Столбики трат заметно выше, чем в компактном Income vs Expenses: это
  * главный график экрана, и разница между месяцами по нему должна читаться
- * без вглядывания. Высота области — столбик плюс две строки подписей.
+ * без вглядывания. Высота области — столбик плюс строка подписи месяца.
  */
 const SPEND_BAR_MAX_HEIGHT = 150;
-const SPEND_CHART_HEIGHT = 196;
+
+/** Высота графика трат. Пустое состояние на экране держит её же. */
+export const SPEND_CHART_HEIGHT = 176;
 
 /** Ширина столбика в режиме прокрутки — на год колонки ужимаются. */
 function columnWidth(count: number): number {
@@ -116,9 +117,6 @@ export function SpendingBars({ buckets, selectedKey, onSelect }: BarsProps) {
   const scroll = buckets.length > FIT_LIMIT;
   const width = scroll ? columnWidth(buckets.length) : null;
   const max = Math.max(1, ...buckets.map((bucket) => bucket.spent));
-  // Сумму над каждым столбиком показываем, только пока она читается; на
-  // длинных периодах остаётся сумма выбранного.
-  const showValues = buckets.length <= FIT_LIMIT;
 
   return (
     <ChartScroller scroll={scroll} height={SPEND_CHART_HEIGHT}>
@@ -126,21 +124,9 @@ export function SpendingBars({ buckets, selectedKey, onSelect }: BarsProps) {
         const selected = bucket.key === selectedKey;
         return (
           <Column key={bucket.key} width={width} onPress={() => onSelect(bucket.key)}>
-            <Text
-              numberOfLines={1}
-              adjustsFontSizeToFit
-              minimumFontScale={0.65}
-              style={[
-                typography.tabLabel,
-                {
-                  width: "100%",
-                  textAlign: "center",
-                  color: selected || bucket.isCurrent ? colors.text : colors.textMuted,
-                },
-              ]}
-            >
-              {showValues || selected ? formatMoney(bucket.spent) : ""}
-            </Text>
+            {/* Сумм над столбиками нет намеренно: подписи разной длины ломали
+                ряд, а точное значение и так открывается по тапу. Столбик
+                отвечает за пропорцию, карточка под графиком — за цифры. */}
             <View
               style={{
                 width: "100%",

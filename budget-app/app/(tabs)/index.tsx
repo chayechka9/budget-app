@@ -16,12 +16,9 @@ import {
   spacing,
   typography,
 } from "../../constants/theme";
-import {
-  MOCK_LAST_MONTH,
-  MOCK_MONTH_LABEL,
-  daysLeftInMonth,
-  formatMoney,
-} from "../../lib/mock-data";
+import { daysLeftInMonth } from "../../lib/dates";
+import { MOCK_LAST_MONTH, MOCK_MONTH_LABEL } from "../../lib/mock-data";
+import { formatMoney } from "../../lib/money";
 import { useStore } from "../../lib/store";
 
 const RECENT_COUNT = 3;
@@ -31,7 +28,13 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { transactions, totalBalance, readyToAssign, categories } = useStore();
 
-  const recent = transactions.slice(0, RECENT_COUNT);
+  // Сортируем по дате, а не берём первые из списка: добавленная транзакция
+  // попадает в начало массива независимо от того, каким числом её записали,
+  // и старая трата оказывалась выше свежей.
+  const recent = transactions
+    .slice()
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, RECENT_COUNT);
 
   // Сводка по тратам считается из тех же категорий, что показывает Budget —
   // отдельной логики данных здесь нет.

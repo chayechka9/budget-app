@@ -13,22 +13,9 @@ import {
   spacing,
   typography,
 } from "../constants/theme";
-import { formatMoney } from "../lib/mock-data";
-import { limitMoneyInput } from "../lib/money";
+import { formatMoney, parseMoney, sanitizeMoneyInput } from "../lib/money";
 import { useStore, type ResolvedCategory } from "../lib/store";
 import { useCloseScreen } from "../lib/navigation";
-
-/** Оставляем только цифры и одну точку с двумя знаками после неё. */
-function sanitizeAmount(input: string): string {
-  const cleaned = input.replace(/[^0-9.]/g, "");
-  const [whole, ...rest] = cleaned.split(".");
-  return rest.length > 0 ? `${whole}.${rest.join("").slice(0, 2)}` : whole;
-}
-
-function parseAmount(input: string | undefined): number {
-  const value = Number.parseFloat(input ?? "");
-  return Number.isFinite(value) ? value : 0;
-}
 
 /**
  * Одинаковые метрики шрифта для префикса `€` и для цифр.
@@ -88,19 +75,19 @@ function AssignRow({ category, value, onChange }: AssignRowProps) {
         </Text>
       </View>
 
-      {/* Плашка сама по себе — цель 78×44: это и есть область нажатия, отдельный
-          hitSlop ей больше не нужен. Нажатие в любую её точку переводит фокус
-          в поле, поэтому попадать надо по плашке, а не по строке текста. */}
+      {/* Плашка 96×44 — она же область нажатия, отдельный hitSlop не нужен.
+          Роли кнопки у неё нет намеренно: это не кнопка, а способ попасть
+          пальцем в поле, и с ролью VoiceOver объявил бы инпут кнопкой.
+          Подпись живёт на самом `TextInput`. */}
       <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={`Assign to ${category.name}`}
+        accessible={false}
         onPress={() => input.current?.focus()}
         style={{
           flexDirection: "row",
           alignItems: "center",
           justifyContent: "center",
           gap: 0,
-          minWidth: 78,
+          minWidth: 96,
           height: 44,
           borderRadius: radius.field,
           borderWidth: 1.5,
@@ -117,14 +104,13 @@ function AssignRow({ category, value, onChange }: AssignRowProps) {
             },
           ]}
         >
-          €
+          +€
         </Text>
         <TextInput
           ref={input}
+          accessibilityLabel={`Assign to ${category.name}`}
           value={value}
-          onChangeText={(next) =>
-            onChange(limitMoneyInput(sanitizeAmount(next), value))
-          }
+          onChangeText={(next) => onChange(sanitizeMoneyInput(next, value))}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           keyboardType="decimal-pad"
@@ -135,7 +121,8 @@ function AssignRow({ category, value, onChange }: AssignRowProps) {
             typography.amountRow,
             {
               ...ASSIGN_AMOUNT_TEXT_METRICS,
-              width: 44,
+              // Хватает на «125.50»: при 44 суммы с центами обрезались.
+              width: 62,
               padding: 0,
               margin: 0,
               color: colors.text,
@@ -153,7 +140,7 @@ export default function AssignScreen() {
   const [draft, setDraft] = useState<Record<string, string>>({});
 
   const assignedSum = Object.values(draft).reduce(
-    (sum, value) => sum + parseAmount(value),
+    (sum, value) => sum + parseMoney(value),
     0,
   );
   const remaining = readyToAssign - assignedSum;
@@ -162,7 +149,7 @@ export default function AssignScreen() {
   const done = () => {
     const amounts: Record<string, number> = {};
     for (const [categoryId, value] of Object.entries(draft)) {
-      const amount = parseAmount(value);
+      const amount = parseMoney(value);
       if (amount > 0) amounts[categoryId] = amount;
     }
     assign(amounts);

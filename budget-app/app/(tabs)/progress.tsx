@@ -8,6 +8,7 @@ import {
   ChartAxis,
   IncomeExpenseBars,
   LegendDot,
+  SPEND_CHART_HEIGHT,
   SavingsChart,
   SpendingBars,
 } from "../../components/InsightsCharts";
@@ -27,7 +28,7 @@ import {
   type Bucket,
   type PeriodSelection,
 } from "../../lib/analytics";
-import { formatMoney, formatSignedMoney } from "../../lib/mock-data";
+import { formatMoney, formatSignedMoney } from "../../lib/money";
 import { useStore } from "../../lib/store";
 
 /** Сколько категорий показывать в разбивке по нажатому столбику. */
@@ -43,7 +44,7 @@ const INSIGHTS_PERIOD_OPTIONS: PeriodOption[] = MONTH_PRESETS.filter((preset) =>
   INSIGHTS_PRESET_COUNTS.includes(preset.count),
 ).map((preset) => ({
   label: preset.label,
-  selection: { kind: "preset", unit: "month", count: preset.count } as const,
+  selection: { kind: "preset", count: preset.count } as const,
 }));
 
 /** Какая из карточек открыла меню периода — у них независимые периоды. */
@@ -187,7 +188,7 @@ export default function InsightsScreen() {
     .reduce((sum, category) => sum + category.assigned, 0);
 
   const savings = useMemo(
-    () => savingsCurve(transactions, "month", savingsBuckets, totalSaved),
+    () => savingsCurve(transactions, savingsBuckets, totalSaved),
     [transactions, savingsBuckets, totalSaved],
   );
 
@@ -309,7 +310,7 @@ export default function InsightsScreen() {
                 onSelect={(key) => toggle(key, spendKey, setSpendKey)}
               />
             ) : (
-              <EmptyState label="No spending" height={196} />
+              <EmptyState label="No spending" height={SPEND_CHART_HEIGHT} />
             )}
           </View>
 
@@ -496,7 +497,6 @@ export default function InsightsScreen() {
         anchor={anchor}
         options={INSIGHTS_PERIOD_OPTIONS}
         onSelect={(next) => applyPeriod(menuTarget ?? "spending", next)}
-        onCustom={() => undefined}
         onClose={() => setMenuTarget(null)}
       />
     </View>

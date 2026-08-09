@@ -9,12 +9,8 @@ import { Icon } from "../components/Icon";
 import { MonthPicker } from "../components/MonthPicker";
 import { TransactionRow } from "../components/TransactionRow";
 import { colors, spacing, typography } from "../constants/theme";
-import {
-  formatDayLabel,
-  formatMonthKey,
-  monthKeyOf,
-  type MockTransaction,
-} from "../lib/mock-data";
+import { formatDayLabel, formatMonthKey, monthKeyOf } from "../lib/dates";
+import { type MockTransaction } from "../lib/mock-data";
 import { useStore } from "../lib/store";
 import { useCloseScreen } from "../lib/navigation";
 

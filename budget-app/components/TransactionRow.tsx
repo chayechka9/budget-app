@@ -3,7 +3,7 @@ import { Text, View } from "react-native";
 import { colors, spacing, typography } from "../constants/theme";
 import { IconTile } from "./IconTile";
 import type { IconName } from "./Icon";
-import { formatSignedMoney } from "../lib/mock-data";
+import { formatSignedMoney } from "../lib/money";
 
 type TransactionRowProps = {
   icon: IconName;

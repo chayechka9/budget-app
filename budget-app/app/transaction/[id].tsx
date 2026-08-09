@@ -5,12 +5,9 @@ import { Card } from "../../components/Card";
 import { IconTile } from "../../components/IconTile";
 import { ModalScreen } from "../../components/ModalScreen";
 import { HAIRLINE, colors, spacing, typography } from "../../constants/theme";
-import {
-  formatDayLabel,
-  formatSignedMoney,
-  transactionMethod,
-  transactionTime,
-} from "../../lib/mock-data";
+import { formatDayLabel } from "../../lib/dates";
+import { transactionMethod, transactionTime } from "../../lib/mock-data";
+import { formatSignedMoney } from "../../lib/money";
 import { useStore } from "../../lib/store";
 
 /** Строка «ключ — значение» в списке деталей. */

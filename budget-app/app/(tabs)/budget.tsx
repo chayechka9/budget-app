@@ -11,13 +11,10 @@ import { MonthPicker } from "../../components/MonthPicker";
 import { ProgressRing, spendProgress } from "../../components/Progress";
 import { ReadyToAssignPill } from "../../components/ReadyToAssignPill";
 import { colors, radius, spacing, typography } from "../../constants/theme";
-import {
-  currentMonthKey,
-  monthKeyOfDate,
-  monthKeysTo,
-  spentByCategoryIn,
-} from "../../lib/analytics";
-import { MOCK_LAST_MONTH, formatMoney, formatMonthKey } from "../../lib/mock-data";
+import { monthKeysTo, spentByCategoryIn } from "../../lib/analytics";
+import { currentMonthKey, formatMonthKey, monthKeyOf } from "../../lib/dates";
+import { MOCK_LAST_MONTH } from "../../lib/mock-data";
+import { formatMoney } from "../../lib/money";
 import { useStore, type ResolvedCategory } from "../../lib/store";
 
 /**
@@ -40,7 +37,14 @@ function FixedRow({ category }: { category: MonthCategory }) {
     <CategoryCard
       name={category.name}
       icon={category.icon}
-      value={formatMoney(remaining)}
+      // Перерасход подписан «over» и без минуса: «−€28.50 left» читалось бы
+      // как «осталось минус двадцать восемь».
+      value={
+        remaining >= 0
+          ? `${formatMoney(remaining)} left`
+          : `${formatMoney(Math.abs(remaining))} over`
+      }
+      overspent={remaining < 0}
       progress={bar.value}
       overspend={bar.overspend}
       caption={`${formatMoney(category.spent)} of ${formatMoney(category.assigned)}`}
@@ -112,7 +116,7 @@ export default function BudgetScreen() {
     [transactions, thisMonth],
   );
   const monthsWithData = useMemo(
-    () => [...new Set(transactions.map((transaction) => monthKeyOfDate(transaction.date)))],
+    () => [...new Set(transactions.map((transaction) => monthKeyOf(transaction.date)))],
     [transactions],
   );
 
