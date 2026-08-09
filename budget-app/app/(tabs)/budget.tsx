@@ -44,7 +44,6 @@ function FixedRow({ category }: { category: MonthCategory }) {
           ? `${formatMoney(remaining)} left`
           : `${formatMoney(Math.abs(remaining))} over`
       }
-      overspent={remaining < 0}
       progress={bar.value}
       overspend={bar.overspend}
       caption={`${formatMoney(category.spent)} of ${formatMoney(category.assigned)}`}

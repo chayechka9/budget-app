@@ -104,7 +104,7 @@ function AssignRow({ category, value, onChange }: AssignRowProps) {
             },
           ]}
         >
-          +€
+          €
         </Text>
         <TextInput
           ref={input}
