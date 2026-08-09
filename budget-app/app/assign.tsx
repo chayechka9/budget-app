@@ -29,6 +29,15 @@ function parseAmount(input: string | undefined): number {
   return Number.isFinite(value) ? value : 0;
 }
 
+/** Одинаковая строка шрифта для префикса `€`, цифр и caret. */
+const ASSIGN_AMOUNT_TEXT_METRICS = {
+  height: 20,
+  fontSize: 14.5,
+  fontWeight: "700" as const,
+  lineHeight: 20,
+  includeFontPadding: false,
+};
+
 type AssignRowProps = {
   category: ResolvedCategory;
   value: string;
@@ -75,7 +84,7 @@ function AssignRow({ category, value, onChange }: AssignRowProps) {
         onPress={() => input.current?.focus()}
         style={{
           flexDirection: "row",
-          alignItems: "baseline",
+          alignItems: "center",
           justifyContent: "center",
           gap: 0,
           minWidth: 78,
@@ -90,8 +99,7 @@ function AssignRow({ category, value, onChange }: AssignRowProps) {
           style={[
             typography.amountRow,
             {
-              fontSize: 14.5,
-              fontWeight: "700",
+              ...ASSIGN_AMOUNT_TEXT_METRICS,
               color: colors.textMuted,
             },
           ]}
@@ -111,10 +119,13 @@ function AssignRow({ category, value, onChange }: AssignRowProps) {
           style={[
             typography.amountRow,
             {
+              ...ASSIGN_AMOUNT_TEXT_METRICS,
               width: 44,
               padding: 0,
-              fontSize: 14.5,
-              fontWeight: "700",
+              paddingHorizontal: 0,
+              paddingVertical: 0,
+              margin: 0,
+              textAlignVertical: "center",
               color: colors.text,
             },
           ]}
