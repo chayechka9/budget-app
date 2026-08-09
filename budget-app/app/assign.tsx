@@ -7,7 +7,6 @@ import { IconTile } from "../components/IconTile";
 import { ModalScreen } from "../components/ModalScreen";
 import { ProgressBar, spendProgress } from "../components/Progress";
 import {
-  OVERSPEND_DOT_SIZE,
   colors,
   progressHeight,
   radius,
@@ -36,14 +35,10 @@ type AssignRowProps = {
   onChange: (value: string) => void;
 };
 
-/** Строка категории с полем «+€»: слева что уже есть, справа сколько добавить. */
+/** Строка категории с полем «€»: слева что уже есть, справа сколько добавить. */
 function AssignRow({ category, value, onChange }: AssignRowProps) {
   const input = useRef<TextInput>(null);
   const [focused, setFocused] = useState(false);
-  // Поле с введённой суммой выглядит иначе, чем пустое: белая подложка и
-  // зелёный «+€» показывают, что в эту категорию уже что-то положили, ещё до
-  // того, как читаешь цифру.
-  const filled = parseAmount(value) > 0;
 
   const current =
     category.kind === "savings"
@@ -80,24 +75,15 @@ function AssignRow({ category, value, onChange }: AssignRowProps) {
         onPress={() => input.current?.focus()}
         style={{
           flexDirection: "row",
-          alignItems: "center",
+          alignItems: "baseline",
           justifyContent: "center",
-          gap: 2,
+          gap: 0,
           minWidth: 78,
           height: 44,
           borderRadius: radius.field,
           borderWidth: 1.5,
-          backgroundColor: focused || filled ? colors.surface : colors.surfaceField,
-          borderColor: focused
-            ? colors.positive
-            : filled
-              ? colors.fieldBorderFilled
-              : colors.fieldBorder,
-          // Фокус видно кольцом наружу, а не сменой размера: поле не должно
-          // дёргать соседние строки, когда в него встают.
-          ...(focused
-            ? { boxShadow: `0 0 0 3px ${colors.positiveSurfacePressed}` }
-            : null),
+          backgroundColor: colors.surfaceField,
+          borderColor: focused ? colors.fieldBorderFilled : colors.fieldBorder,
         }}
       >
         <Text
@@ -106,11 +92,11 @@ function AssignRow({ category, value, onChange }: AssignRowProps) {
             {
               fontSize: 14.5,
               fontWeight: "700",
-              color: filled ? colors.positiveText : colors.textMuted,
+              color: colors.textMuted,
             },
           ]}
         >
-          +€
+          €
         </Text>
         <TextInput
           ref={input}
@@ -174,32 +160,17 @@ export default function AssignScreen() {
           Remaining to assign
         </Text>
 
-        <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
-          <Text
-            style={[
-              typography.amountLarge,
-              {
-                marginTop: 2,
-                // Перерасход остаётся нейтральным по цвету — сигналит точка,
-                // как и в строках категорий на Budget.
-                color: overAssigned ? colors.text : colors.positiveText,
-              },
-            ]}
-          >
-            {formatMoney(remaining)}
-          </Text>
-          {overAssigned ? (
-            <View
-              accessibilityLabel="More than you have"
-              style={{
-                width: OVERSPEND_DOT_SIZE,
-                height: OVERSPEND_DOT_SIZE,
-                borderRadius: radius.pill,
-                backgroundColor: colors.overspend,
-              }}
-            />
-          ) : null}
-        </View>
+        <Text
+          style={[
+            typography.amountLarge,
+            {
+              marginTop: 2,
+              color: overAssigned ? colors.text : colors.positiveText,
+            },
+          ]}
+        >
+          {formatMoney(remaining)}
+        </Text>
 
         <ProgressBar
           // Та же раскладка, что и у трат: зелёное — разложенное по плану,

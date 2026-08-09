@@ -13,6 +13,7 @@ import { ReadyToAssignPill } from "../../components/ReadyToAssignPill";
 import { colors, radius, spacing, typography } from "../../constants/theme";
 import {
   currentMonthKey,
+  monthKeyOfDate,
   monthKeysTo,
   spentByCategoryIn,
 } from "../../lib/analytics";
@@ -39,14 +40,7 @@ function FixedRow({ category }: { category: MonthCategory }) {
     <CategoryCard
       name={category.name}
       icon={category.icon}
-      // В макете перерасход подписан «over» и без минуса: «€28.50 over».
-      // «−€28.50 left» читалось бы как «осталось минус двадцать восемь».
-      value={
-        remaining >= 0
-          ? `${formatMoney(remaining)} left`
-          : `${formatMoney(Math.abs(remaining))} over`
-      }
-      overspent={remaining < 0}
+      value={formatMoney(remaining)}
       progress={bar.value}
       overspend={bar.overspend}
       caption={`${formatMoney(category.spent)} of ${formatMoney(category.assigned)}`}
@@ -116,6 +110,10 @@ export default function BudgetScreen() {
   const months = useMemo(
     () => monthKeysTo(transactions, thisMonth),
     [transactions, thisMonth],
+  );
+  const monthsWithData = useMemo(
+    () => [...new Set(transactions.map((transaction) => monthKeyOfDate(transaction.date)))],
+    [transactions],
   );
 
   // Позицию меряем в окне: экран скроллится, и фиксированный отступ сверху
@@ -311,6 +309,7 @@ export default function BudgetScreen() {
       <MonthPicker
         visible={pickerOpen}
         months={months}
+        monthsWithData={monthsWithData}
         value={selected}
         anchor={anchor}
         onSelect={(next) => {

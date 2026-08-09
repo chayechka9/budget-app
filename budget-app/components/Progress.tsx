@@ -51,7 +51,6 @@ export function ProgressBar({
         style={{
           width: `${filled * 100}%`,
           height: "100%",
-          borderRadius: radius.pill,
           // В макете заливка — тёмная, а не чёрный текстовый цвет.
           backgroundColor: tone === "positive" ? toneColor(tone) : colors.surfaceInverse,
         }}
@@ -62,7 +61,6 @@ export function ProgressBar({
           style={{
             width: `${over * 100}%`,
             height: "100%",
-            borderRadius: radius.pill,
             backgroundColor: colors.overspend,
           }}
         />
