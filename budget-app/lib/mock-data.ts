@@ -8,6 +8,7 @@
 
 import type { IconName } from "../components/Icon";
 import { startOfToday } from "./dates";
+import type { SavingsEvent } from "./savings-history";
 
 export type CategoryKind = "fixed" | "savings";
 
@@ -68,6 +69,46 @@ export const MOCK_GROUPS: MockGroup[] = [
       { id: "c-laptop", name: "New laptop", kind: "savings", icon: "laptop", assigned: 410 },
     ],
   },
+];
+
+/**
+ * Явный demo seed истории накоплений для in-memory прототипа.
+ *
+ * Это не пользовательские данные и не реконструкция из доходов/расходов.
+ * Суммы — отдельные детерминированные операции Assign, которые в сумме дают
+ * текущие demo-балансы savings-категорий: €3,200 + €740 + €410.
+ */
+export const DEMO_SAVINGS_EVENT_SEED: SavingsEvent[] = [
+  { id: "s-demo-2025-06-emergency", categoryId: "c-emergency", amount: 250, date: "2025-06-15" },
+  { id: "s-demo-2025-07-emergency", categoryId: "c-emergency", amount: 250, date: "2025-07-15" },
+  { id: "s-demo-2025-08-emergency", categoryId: "c-emergency", amount: 250, date: "2025-08-15" },
+  { id: "s-demo-2025-09-emergency", categoryId: "c-emergency", amount: 250, date: "2025-09-15" },
+  { id: "s-demo-2025-09-trip", categoryId: "c-trip", amount: 100, date: "2025-09-15" },
+  { id: "s-demo-2025-10-emergency", categoryId: "c-emergency", amount: 250, date: "2025-10-15" },
+  { id: "s-demo-2025-11-emergency", categoryId: "c-emergency", amount: 250, date: "2025-11-15" },
+  { id: "s-demo-2025-11-trip", categoryId: "c-trip", amount: 100, date: "2025-11-15" },
+  { id: "s-demo-2025-12-emergency", categoryId: "c-emergency", amount: 250, date: "2025-12-15" },
+  { id: "s-demo-2025-12-laptop", categoryId: "c-laptop", amount: 100, date: "2025-12-15" },
+  { id: "s-demo-2026-01-emergency", categoryId: "c-emergency", amount: 250, date: "2026-01-15" },
+  { id: "s-demo-2026-01-trip", categoryId: "c-trip", amount: 100, date: "2026-01-15" },
+  { id: "s-demo-2026-02-emergency", categoryId: "c-emergency", amount: 250, date: "2026-02-15" },
+  { id: "s-demo-2026-02-laptop", categoryId: "c-laptop", amount: 100, date: "2026-02-15" },
+  { id: "s-demo-2026-03-emergency", categoryId: "c-emergency", amount: 250, date: "2026-03-15" },
+  { id: "s-demo-2026-03-trip", categoryId: "c-trip", amount: 100, date: "2026-03-15" },
+  { id: "s-demo-2026-04-emergency", categoryId: "c-emergency", amount: 250, date: "2026-04-15" },
+  { id: "s-demo-2026-04-trip", categoryId: "c-trip", amount: 90, date: "2026-04-15" },
+  { id: "s-demo-2026-04-laptop", categoryId: "c-laptop", amount: 100, date: "2026-04-15" },
+  { id: "s-demo-2026-05-emergency", categoryId: "c-emergency", amount: 200, date: "2026-05-15" },
+  { id: "s-demo-2026-05-trip", categoryId: "c-trip", amount: 80, date: "2026-05-15" },
+  { id: "s-demo-2026-06-emergency", categoryId: "c-emergency", amount: 150, date: "2026-06-15" },
+  { id: "s-demo-2026-06-trip", categoryId: "c-trip", amount: 70, date: "2026-06-15" },
+  { id: "s-demo-2026-06-laptop", categoryId: "c-laptop", amount: 50, date: "2026-06-15" },
+  { id: "s-demo-2026-07-emergency", categoryId: "c-emergency", amount: 50, date: "2026-07-15" },
+  { id: "s-demo-2026-07-trip", categoryId: "c-trip", amount: 50, date: "2026-07-15" },
+  { id: "s-demo-2026-07-laptop", categoryId: "c-laptop", amount: 30, date: "2026-07-15" },
+  { id: "s-demo-2026-08-emergency", categoryId: "c-emergency", amount: 50, date: "2026-08-01" },
+  { id: "s-demo-2026-08-trip", categoryId: "c-trip", amount: 50, date: "2026-08-01" },
+  { id: "s-demo-2026-08-laptop", categoryId: "c-laptop", amount: 30, date: "2026-08-01" },
 ];
 
 /** Свежие траты — то, что видно на Home в «Recent» и вверху Activity. */

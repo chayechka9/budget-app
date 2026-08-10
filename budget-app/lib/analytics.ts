@@ -20,6 +20,10 @@ import {
   toIsoDate,
   todayIso,
 } from "./dates";
+import {
+  savingsHistoryForMonths,
+  type SavingsMonthBalance,
+} from "./savings-history";
 
 /** Минимум, который нужен агрегации. `amount` со знаком: минус — трата. */
 export interface AnalyticsTransaction {
@@ -244,42 +248,15 @@ export function categoryBreakdown(
     .slice(0, limit);
 }
 
-/**
- * Кривая накоплений по месяцам.
- *
- * Истории накоплений в данных нет — есть только текущий итог по savings-
- * категориям. Поэтому итог раскладывается назад по всей истории транзакций
- * пропорционально тому, сколько в каждом месяце осталось неистраченным
- * (доход минус траты). Свойства, которые это даёт: кривая не уходит в минус,
- * не убывает и в последней точке равна ровно текущему накопленному.
- *
- * Считается всегда по всей истории, а не по выбранному окну — иначе смена
- * периода двигала бы значения в точках, которые от периода зависеть не должны.
- */
-export function savingsCurve(
-  transactions: AnalyticsTransaction[],
+/** Готовые точки истории для выбранных месячных корзин без перерасчёта значений. */
+export function savingsHistoryForBuckets(
+  history: SavingsMonthBalance[],
   visible: Bucket[],
-  totalSaved: number,
-): number[] {
-  const history = bucketsFor(transactions, { kind: "preset", count: 0 });
-
-  let running = 0;
-  const cumulativeByKey = new Map<string, number>();
-  for (const bucket of history) {
-    running += Math.max(0, bucket.net);
-    cumulativeByKey.set(bucket.key, running);
-  }
-
-  // Ни одного месяца с положительным остатком — раскладывать нечего,
-  // показываем текущий итог ровной линией.
-  if (running <= 0) return visible.map(() => totalSaved);
-
-  return visible.map((bucket) => {
-    const cumulative = cumulativeByKey.get(bucket.key);
-    // Корзины вне истории наследуют итог.
-    if (cumulative === undefined) return totalSaved;
-    return (totalSaved * cumulative) / running;
-  });
+): SavingsMonthBalance[] {
+  return savingsHistoryForMonths(
+    history,
+    visible.map((bucket) => bucket.key),
+  );
 }
 
 /** Подпись выбранного периода — она же кнопка, открывающая меню. */

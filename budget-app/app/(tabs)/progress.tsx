@@ -24,7 +24,7 @@ import {
   bucketsFor,
   categoryBreakdown,
   describeSelection,
-  savingsCurve,
+  savingsHistoryForBuckets,
   type Bucket,
   type PeriodSelection,
 } from "../../lib/analytics";
@@ -146,7 +146,7 @@ function EmptyState({ label, height }: { label: string; height: number }) {
 
 export default function InsightsScreen() {
   const insets = useSafeAreaInsets();
-  const { transactions, categories } = useStore();
+  const { transactions, categories, savingsHistory } = useStore();
 
   const [spendingPeriod, setSpendingPeriod] = useState<PeriodSelection>(DEFAULT_PERIOD);
   const [flowPeriod, setFlowPeriod] = useState<PeriodSelection>(DEFAULT_PERIOD);
@@ -187,10 +187,11 @@ export default function InsightsScreen() {
     .filter((category) => category.kind === "savings")
     .reduce((sum, category) => sum + category.assigned, 0);
 
-  const savings = useMemo(
-    () => savingsCurve(transactions, savingsBuckets, totalSaved),
-    [transactions, savingsBuckets, totalSaved],
+  const savingsPoints = useMemo(
+    () => savingsHistoryForBuckets(savingsHistory, savingsBuckets),
+    [savingsHistory, savingsBuckets],
   );
+  const savings = savingsPoints.map((point) => point.balance);
 
   const spendingLabel = describeSelection(spendingPeriod, spendBuckets);
   const flowLabel = describeSelection(flowPeriod, flowBuckets);
@@ -223,8 +224,7 @@ export default function InsightsScreen() {
     savings.length === 0
       ? 0
       : Math.min(savIndex ?? savings.length - 1, savings.length - 1);
-  const savedChange =
-    savActive > 0 ? savings[savActive] - savings[savActive - 1] : 0;
+  const savedChange = savingsPoints[savActive]?.change ?? 0;
 
   const applyPeriod = (target: PeriodTarget, next: PeriodSelection) => {
     if (target === "spending") {

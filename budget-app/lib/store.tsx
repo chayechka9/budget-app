@@ -10,6 +10,7 @@ import {
 
 import type { IconName } from "../components/Icon";
 import {
+  DEMO_SAVINGS_EVENT_SEED,
   MOCK_GROUPS,
   MOCK_SUMMARY,
   MOCK_TRANSACTIONS,
@@ -18,6 +19,14 @@ import {
   type MockTransaction,
 } from "./mock-data";
 import { isMoneyAmountWithinLimit } from "./money";
+import { currentMonthKey } from "./dates";
+import {
+  buildSavingsHistory,
+  savingsBalanceByCategory,
+  savingsEventsForAssignment,
+  type SavingsEvent,
+  type SavingsMonthBalance,
+} from "./savings-history";
 
 /**
  * Временное хранилище в памяти.
@@ -116,6 +125,10 @@ type NamedCategory = PlacedCategory & { matchNames: string[] };
 
 interface Store {
   transactions: MockTransaction[];
+  /** Фактические операции накопления, включая явно обозначенный demo seed. */
+  savingsEvents: SavingsEvent[];
+  /** Полная история баланса; период Insights только фильтрует эти точки. */
+  savingsHistory: SavingsMonthBalance[];
   /** Группы с учётом добавленных трат и распределённых денег. */
   groups: ResolvedGroup[];
   /** Тот же список плоско — для поиска категории по id. */
@@ -134,6 +147,9 @@ const StoreContext = createContext<Store | null>(null);
 export function StoreProvider({ children }: PropsWithChildren) {
   const [added, setAdded] = useState<MockTransaction[]>([]);
   const [assignedByCategory, setAssignedByCategory] = useState<Record<string, number>>({});
+  const [savingsEvents, setSavingsEvents] = useState<SavingsEvent[]>(
+    DEMO_SAVINGS_EVENT_SEED,
+  );
   /** Группы, созданные через «New group» в форме категории. */
   const [extraGroups, setExtraGroups] = useState<{ id: string; name: string }[]>([]);
   /** Категории, созданные в этой сессии. */
@@ -162,7 +178,6 @@ export function StoreProvider({ children }: PropsWithChildren) {
       (sum, amount) => sum + amount,
       0,
     );
-
     // Правки накладываются до раскладки по группам: смена группы — это тоже
     // правка, и категория должна уехать в новую группу, а не остаться в старой.
     const placed: NamedCategory[] = [
@@ -182,6 +197,17 @@ export function StoreProvider({ children }: PropsWithChildren) {
       };
     });
 
+    // История и текущие balances используют только категории, которые сейчас
+    // являются savings. Это сохраняет общий итог при смене типа категории.
+    const savingsCategoryIds = new Set(
+      placed.filter((category) => category.kind === "savings").map(({ id }) => id),
+    );
+    const activeSavingsEvents = savingsEvents.filter((event) =>
+      savingsCategoryIds.has(event.categoryId),
+    );
+    const savingsByCategory = savingsBalanceByCategory(activeSavingsEvents);
+    const savingsHistory = buildSavingsHistory(activeSavingsEvents, currentMonthKey());
+
     const groups: ResolvedGroup[] = [
       ...MOCK_GROUPS.map(({ id, name }) => ({ id, name })),
       ...extraGroups,
@@ -193,9 +219,12 @@ export function StoreProvider({ children }: PropsWithChildren) {
         .map((category) => ({
           ...category,
           groupName: group.name,
-          // У fixed это план на месяц, у savings — уже накопленное. Assign
-          // пополняет и то, и другое.
-          assigned: category.assigned + (assignedByCategory[category.id] ?? 0),
+          // У savings единственный источник баланса — фактические события.
+          // Обычные категории по-прежнему используют месячный план + Assign.
+          assigned:
+            category.kind === "savings"
+              ? (savingsByCategory[category.id] ?? 0)
+              : category.assigned + (assignedByCategory[category.id] ?? 0),
           spent:
             category.kind === "fixed"
               ? (category.spent ?? 0) +
@@ -209,6 +238,8 @@ export function StoreProvider({ children }: PropsWithChildren) {
 
     return {
       transactions: [...added, ...MOCK_TRANSACTIONS],
+      savingsEvents,
+      savingsHistory,
       groups,
       categories: groups.flatMap((group) => group.categories),
       totalBalance: MOCK_SUMMARY.totalBalance + balanceDelta,
@@ -232,14 +263,23 @@ export function StoreProvider({ children }: PropsWithChildren) {
         ]);
       },
       assign: (amountByCategoryId) => {
+        const validAmounts = Object.fromEntries(
+          Object.entries(amountByCategoryId).filter(
+            ([, amount]) => isMoneyAmountWithinLimit(amount) && amount > 0,
+          ),
+        );
+
         setAssignedByCategory((current) => {
           const next = { ...current };
-          for (const [categoryId, amount] of Object.entries(amountByCategoryId)) {
-            if (!isMoneyAmountWithinLimit(amount) || amount <= 0) continue;
+          for (const [categoryId, amount] of Object.entries(validAmounts)) {
             next[categoryId] = (next[categoryId] ?? 0) + amount;
           }
           return next;
         });
+        setSavingsEvents((current) => [
+          ...current,
+          ...savingsEventsForAssignment(validAmounts, placed, current.length),
+        ]);
       },
       addCategory: (draft) => {
         if (!isMoneyAmountWithinLimit(draft.amount)) return;
@@ -286,7 +326,7 @@ export function StoreProvider({ children }: PropsWithChildren) {
         }));
       },
     };
-  }, [added, assignedByCategory, extraGroups, extraCategories, edits]);
+  }, [added, assignedByCategory, savingsEvents, extraGroups, extraCategories, edits]);
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
 }
