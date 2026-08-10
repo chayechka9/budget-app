@@ -1,3 +1,4 @@
+import { useLocalSearchParams } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
   Pressable,
@@ -16,7 +17,7 @@ import { Icon, type IconName } from "../components/Icon";
 import { NumericKeypad } from "../components/NumericKeypad";
 import { SegmentedControl } from "../components/SegmentedControl";
 import { colors, iconSize, radius, spacing, typography } from "../constants/theme";
-import { MOCK_INCOME_SOURCES } from "../lib/mock-data";
+import { MOCK_INCOME_SOURCES, type MockTransaction } from "../lib/mock-data";
 import {
   appendMoneyKey,
   formatMoney,
@@ -24,7 +25,7 @@ import {
   parseMoney,
 } from "../lib/money";
 import { useStore, type TransactionType } from "../lib/store";
-import { useCloseScreen } from "../lib/navigation";
+import { useCloseScreen, useCloseTransactionFlow } from "../lib/navigation";
 
 /** Сегодняшняя дата как YYYY-MM-DD. */
 function today(): string {
@@ -293,16 +294,76 @@ function CategoryPicker({
   );
 }
 
-export default function AddTransactionScreen() {
-  const close = useCloseScreen();
-  const { addTransaction, categories } = useStore();
+/** Стартовые значения формы: пустые для новой траты, текущие для правки. */
+function initialValues(editing: MockTransaction | undefined) {
+  if (!editing) {
+    return {
+      type: "expense" as TransactionType,
+      amount: "",
+      selected: null,
+      note: "",
+      date: today(),
+    };
+  }
 
-  const [type, setType] = useState<TransactionType>("expense");
-  const [amount, setAmount] = useState("");
-  const [selected, setSelected] = useState<{ name: string; icon: IconName } | null>(null);
-  const [note, setNote] = useState("");
-  const [date, setDate] = useState(today());
+  const income = editing.amount > 0;
+  return {
+    type: (income ? "income" : "expense") as TransactionType,
+    amount: String(Math.abs(editing.amount)),
+    // У дохода выбран источник, у расхода — категория. Иконку берём из самой
+    // записи: она уже та, что показывается в списке.
+    selected: {
+      name: income ? editing.payee : editing.category,
+      icon: editing.icon,
+    } as TransactionOption,
+    // В `payee` у расхода лежит заметка, а если её не было — название
+    // категории. Второе в поле заметки показывать нечего.
+    note: !income && editing.payee !== editing.category ? editing.payee : "",
+    date: editing.date,
+  };
+}
+
+/**
+ * Шит транзакции — один на создание и правку.
+ *
+ * Без параметра это «New transaction»; с `?id=…` — «Edit transaction» с
+ * предзаполненными полями, кнопкой Save и тихой ссылкой удаления под ней.
+ * Второй экран не заводили по той же причине, что и у категорий: поля
+ * совпадают полностью, и две копии разъехались бы.
+ */
+export default function TransactionSheetScreen() {
+  const close = useCloseScreen();
+  const closeFlow = useCloseTransactionFlow();
+  const { id } = useLocalSearchParams<{ id?: string }>();
+  const { addTransaction, updateTransaction, deleteTransaction, categories, transactions } =
+    useStore();
+
+  const editing = id ? transactions.find((transaction) => transaction.id === id) : undefined;
+  const initial = initialValues(editing);
+
+  const [type, setType] = useState<TransactionType>(initial.type);
+  const [amount, setAmount] = useState(initial.amount);
+  const [selected, setSelected] = useState<TransactionOption | null>(initial.selected);
+  const [note, setNote] = useState(initial.note);
+  const [date, setDate] = useState(initial.date);
   const [dateOpen, setDateOpen] = useState(false);
+  /** Удаление уже спросило подтверждение и ждёт второго тапа. */
+  const [deleteArmed, setDeleteArmed] = useState(false);
+
+  // Шит может остаться смонтированным между открытиями (правка одной записи,
+  // затем добавление новой): useState тогда не переинициализируется и форма
+  // показала бы прошлые значения. Сбрасываем её на смену id.
+  const [shownId, setShownId] = useState(id);
+  if (id !== shownId) {
+    setShownId(id);
+    setType(initial.type);
+    setAmount(initial.amount);
+    setSelected(initial.selected);
+    setNote(initial.note);
+    setDate(initial.date);
+    setDateOpen(false);
+    setDeleteArmed(false);
+  }
 
   const isIncome = type === "income";
   // Доход — позитивное событие, поэтому акцент зелёный, а не тёмный.
@@ -330,19 +391,42 @@ export default function AddTransactionScreen() {
 
   const save = () => {
     if (!canSave || !selected) return;
-    addTransaction({
+    const input = {
       type,
       amount: parsedAmount,
       label: selected.name,
       icon: selected.icon,
       note,
       date,
-    });
+    };
+
+    if (editing) {
+      updateTransaction(editing.id, input);
+    } else {
+      addTransaction(input);
+    }
     close();
   };
 
+  /**
+   * Первый тап только взводит подтверждение, второй удаляет. Нативный Alert
+   * здесь был бы резче, чем всё остальное в приложении.
+   */
+  const remove = () => {
+    if (!editing) return;
+    if (!deleteArmed) {
+      setDeleteArmed(true);
+      return;
+    }
+    deleteTransaction(editing.id);
+    closeFlow();
+  };
+
   return (
-    <BottomSheet title="New transaction" onClose={() => close()}>
+    <BottomSheet
+      title={editing ? "Edit transaction" : "New transaction"}
+      onClose={() => close()}
+    >
       <ScrollView
         style={{ flexShrink: 1 }}
         contentContainerStyle={{ flexGrow: 0 }}
@@ -474,6 +558,26 @@ export default function AddTransactionScreen() {
         onPress={save}
         style={{ marginTop: 10 }}
       />
+
+      {/* Удаление — тихая ссылка без подложки: действие редкое и не должно
+          спорить с Save. Красный в проекте занят перерасходом бюджета. */}
+      {editing ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={deleteArmed ? "Tap again to delete" : "Delete transaction"}
+          onPress={remove}
+          style={{ alignItems: "center", marginTop: 14, padding: 6 }}
+        >
+          <Text
+            style={[
+              typography.rowTitle,
+              { color: deleteArmed ? colors.textConfirm : colors.textSecondary },
+            ]}
+          >
+            {deleteArmed ? "Tap again to delete" : "Delete transaction"}
+          </Text>
+        </Pressable>
+      ) : null}
     </BottomSheet>
   );
 }

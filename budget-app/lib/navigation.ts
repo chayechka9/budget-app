@@ -20,3 +20,23 @@ export function useCloseScreen(): () => void {
     }
   };
 }
+
+/**
+ * Закрыть шит правки вместе с экраном деталей под ним.
+ *
+ * После удаления возвращаться на детали нечего: там осталась бы запись,
+ * которой уже нет. Уходим на два экрана назад — к списку, из которого
+ * транзакцию открыли.
+ */
+export function useCloseTransactionFlow(): () => void {
+  const router = useRouter();
+  const close = useCloseScreen();
+
+  return () => {
+    if (router.canDismiss()) {
+      router.dismiss(2);
+    } else {
+      close();
+    }
+  };
+}

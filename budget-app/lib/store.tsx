@@ -66,6 +66,24 @@ export interface CategoryDraft {
   newGroupName?: string;
 }
 
+/**
+ * Поля записи, выведенные из заполненной формы. Одни и те же для новой
+ * транзакции и для правки существующей — иначе созданная и отредактированная
+ * запись начали бы по-разному называться в списке.
+ */
+function transactionFieldsFrom(input: NewTransaction) {
+  return {
+    // У дохода в строке показываем источник, у расхода — заметку,
+    // а если её нет — название категории.
+    payee: input.type === "income" ? input.label : input.note.trim() || input.label,
+    category: input.type === "income" ? "Income" : input.label,
+    icon: input.icon,
+    // Расход уменьшает баланс, доход увеличивает.
+    amount: input.type === "income" ? input.amount : -input.amount,
+    date: input.date,
+  };
+}
+
 /** Название группы в id: «Fun money» → «fun-money». */
 function slugify(value: string): string {
   return (
@@ -137,6 +155,15 @@ interface Store {
   totalBalance: number;
   readyToAssign: number;
   addTransaction: (input: NewTransaction) => void;
+  /** Переписать существующую транзакцию значениями из формы. */
+  updateTransaction: (id: string, input: NewTransaction) => void;
+  deleteTransaction: (id: string) => void;
+  /** id последней удалённой транзакции, пока Undo ещё на экране. */
+  pendingUndo: string | null;
+  /** Вернуть удалённую транзакцию. */
+  undoDelete: () => void;
+  /** Убрать предложение Undo, оставив удаление в силе. */
+  dismissUndo: () => void;
   /** Разложить деньги из Ready to assign по категориям: id категории → сумма. */
   assign: (amountByCategoryId: Record<string, number>) => void;
   addCategory: (draft: CategoryDraft) => void;
@@ -147,6 +174,13 @@ const StoreContext = createContext<Store | null>(null);
 
 export function StoreProvider({ children }: PropsWithChildren) {
   const [added, setAdded] = useState<MockTransaction[]>([]);
+  /** Правки транзакций: id → изменённые поля. Моковые правятся так же. */
+  const [transactionEdits, setTransactionEdits] = useState<
+    Record<string, Partial<MockTransaction>>
+  >({});
+  /** id удалённых транзакций — запись просто исчезает из всех списков. */
+  const [deletedTransactionIds, setDeletedTransactionIds] = useState<string[]>([]);
+  const [pendingUndo, setPendingUndo] = useState<string | null>(null);
   const [assignedByCategory, setAssignedByCategory] = useState<Record<string, number>>({});
   const [savingsEvents, setSavingsEvents] = useState<SavingsEvent[]>(
     DEMO_SAVINGS_EVENT_SEED,
@@ -159,20 +193,55 @@ export function StoreProvider({ children }: PropsWithChildren) {
   const [edits, setEdits] = useState<Record<string, Partial<PlacedCategory>>>({});
 
   const value = useMemo<Store>(() => {
+    const deleted = new Set(deletedTransactionIds);
+    /** Транзакция с уже применённой правкой сессии. */
+    const withEdits = (transaction: MockTransaction): MockTransaction =>
+      transactionEdits[transaction.id]
+        ? { ...transaction, ...transactionEdits[transaction.id] }
+        : transaction;
+
+    const transactions = [...added, ...MOCK_TRANSACTIONS]
+      .filter((transaction) => !deleted.has(transaction.id))
+      .map(withEdits);
+
+    /**
+     * Вклад транзакций в итоги поверх моковых цифр.
+     *
+     * Добавленная в сессии запись считается целиком. Моковая уже учтена и в
+     * MOCK_SUMMARY, и в `spent` категорий, поэтому попадает сюда только если
+     * её правили или удалили: минусом — прежний вклад, плюсом — то, чем она
+     * стала. Так правка расхода сама переносит трату между категориями.
+     */
+    const contributions: { transaction: MockTransaction; sign: 1 | -1 }[] = [];
+    for (const transaction of added) {
+      if (deleted.has(transaction.id)) continue;
+      contributions.push({ transaction: withEdits(transaction), sign: 1 });
+    }
+    for (const transaction of MOCK_TRANSACTIONS) {
+      const changed = transactionEdits[transaction.id] !== undefined;
+      const removed = deleted.has(transaction.id);
+      if (!changed && !removed) continue;
+      contributions.push({ transaction, sign: -1 });
+      if (!removed) contributions.push({ transaction: withEdits(transaction), sign: 1 });
+    }
+
     // Расход уменьшает баланс, доход увеличивает.
-    const balanceDelta = added.reduce((sum, transaction) => sum + transaction.amount, 0);
+    const balanceDelta = contributions.reduce(
+      (sum, { transaction, sign }) => sum + sign * transaction.amount,
+      0,
+    );
 
     // Доход не привязан к категории: он пополняет пул нераспределённых денег.
-    const incomeDelta = added
-      .filter((transaction) => transaction.amount > 0)
-      .reduce((sum, transaction) => sum + transaction.amount, 0);
+    const incomeDelta = contributions
+      .filter(({ transaction }) => transaction.amount > 0)
+      .reduce((sum, { transaction, sign }) => sum + sign * transaction.amount, 0);
 
     const extraSpentByCategory: Record<string, number> = {};
-    for (const transaction of added) {
+    for (const { transaction, sign } of contributions) {
       if (transaction.amount >= 0) continue;
       const spent = Math.abs(transaction.amount);
       extraSpentByCategory[transaction.category] =
-        (extraSpentByCategory[transaction.category] ?? 0) + spent;
+        (extraSpentByCategory[transaction.category] ?? 0) + sign * spent;
     }
 
     const assignedTotal = Object.values(assignedByCategory).reduce(
@@ -238,7 +307,7 @@ export function StoreProvider({ children }: PropsWithChildren) {
     }));
 
     return {
-      transactions: [...added, ...MOCK_TRANSACTIONS],
+      transactions,
       savingsEvents,
       savingsHistory,
       groups,
@@ -247,27 +316,48 @@ export function StoreProvider({ children }: PropsWithChildren) {
       readyToAssign: MOCK_SUMMARY.readyToAssign + incomeDelta - assignedTotal,
       addTransaction: (input) => {
         if (!isMoneyAmountWithinLimit(input.amount) || input.amount <= 0) return;
-        const signedAmount = input.type === "income" ? input.amount : -input.amount;
         const timestamp = nowIso();
         setAdded((current) => [
           {
             // Стабильный id, не зависящий от порядка/даты/суммы записи —
             // переживёт перенос на SQLite (Checkpoint 1).
             id: generateId("t"),
-            // У дохода в строке показываем источник, у расхода — заметку,
-            // а если её нет — название категории.
-            payee:
-              input.type === "income" ? input.label : input.note.trim() || input.label,
-            category: input.type === "income" ? "Income" : input.label,
-            icon: input.icon,
-            amount: signedAmount,
-            date: input.date,
+            ...transactionFieldsFrom(input),
             createdAt: timestamp,
             updatedAt: timestamp,
           },
           ...current,
         ]);
       },
+      updateTransaction: (id, input) => {
+        if (!isMoneyAmountWithinLimit(input.amount) || input.amount <= 0) return;
+        setTransactionEdits((current) => ({
+          ...current,
+          [id]: {
+            ...current[id],
+            ...transactionFieldsFrom(input),
+            updatedAt: nowIso(),
+          },
+        }));
+      },
+      deleteTransaction: (id) => {
+        if (!transactions.some((transaction) => transaction.id === id)) return;
+        setDeletedTransactionIds((current) =>
+          current.includes(id) ? current : [...current, id],
+        );
+        // Удаление обратимо, пока на экране висит Undo, поэтому правки записи
+        // не стираем: вернуться она должна такой же, какой была.
+        setPendingUndo(id);
+      },
+      pendingUndo,
+      undoDelete: () => {
+        if (!pendingUndo) return;
+        setDeletedTransactionIds((current) =>
+          current.filter((id) => id !== pendingUndo),
+        );
+        setPendingUndo(null);
+      },
+      dismissUndo: () => setPendingUndo(null),
       assign: (amountByCategoryId) => {
         const validAmounts = Object.fromEntries(
           Object.entries(amountByCategoryId).filter(
@@ -332,7 +422,17 @@ export function StoreProvider({ children }: PropsWithChildren) {
         }));
       },
     };
-  }, [added, assignedByCategory, savingsEvents, extraGroups, extraCategories, edits]);
+  }, [
+    added,
+    transactionEdits,
+    deletedTransactionIds,
+    pendingUndo,
+    assignedByCategory,
+    savingsEvents,
+    extraGroups,
+    extraCategories,
+    edits,
+  ]);
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
 }

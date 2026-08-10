@@ -1,6 +1,7 @@
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { Text, View } from "react-native";
 
+import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { IconTile } from "../../components/IconTile";
 import { ModalScreen } from "../../components/ModalScreen";
@@ -8,6 +9,7 @@ import { HAIRLINE, colors, spacing, typography } from "../../constants/theme";
 import { formatDayLabel } from "../../lib/dates";
 import { transactionMethod, transactionTime } from "../../lib/mock-data";
 import { formatSignedMoney } from "../../lib/money";
+import { useCloseScreen } from "../../lib/navigation";
 import { useStore } from "../../lib/store";
 
 /** Строка «ключ — значение» в списке деталей. */
@@ -34,6 +36,8 @@ function DetailRow({ label, value, first }: { label: string; value: string; firs
 
 export default function TransactionDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const router = useRouter();
+  const close = useCloseScreen();
   const { transactions } = useStore();
 
   const transaction = transactions.find((item) => item.id === id);
@@ -93,6 +97,20 @@ export default function TransactionDetailScreen() {
         <DetailRow label="Time" value={transactionTime(transaction.id)} />
         <DetailRow label="Method" value={transactionMethod(transaction.id, income)} />
       </Card>
+
+      {/* Кнопки во всю ширину: в макете они 46px внутри узкого диалога, здесь
+          это целый модальный экран — высоту берём общую для всех CTA. */}
+      <Button
+        label="Edit"
+        onPress={() => router.push(`/add-transaction?id=${transaction.id}`)}
+        style={{ marginTop: 18 }}
+      />
+      <Button
+        label="Close"
+        variant="muted"
+        onPress={close}
+        style={{ marginTop: spacing.sm }}
+      />
     </ModalScreen>
   );
 }

@@ -3,7 +3,7 @@ import { Pressable, Text, type PressableProps, type ViewStyle } from "react-nati
 
 import { colors, radius, spacing, typography } from "../constants/theme";
 
-export type ButtonVariant = "primary" | "secondary" | "positive";
+export type ButtonVariant = "primary" | "secondary" | "muted" | "positive";
 
 type ButtonProps = Omit<PressableProps, "children" | "style"> & {
   label: string;
@@ -16,6 +16,10 @@ type ButtonProps = Omit<PressableProps, "children" | "style"> & {
 function palette(variant: ButtonVariant) {
   if (variant === "secondary") {
     return { background: colors.surface, label: colors.text, border: colors.border };
+  }
+  if (variant === "muted") {
+    // Светло-серая заливка без рамки — вторая кнопка под тёмной primary.
+    return { background: colors.surfaceField, label: colors.text, border: "transparent" };
   }
   if (variant === "positive") {
     return { background: colors.positive, label: colors.textInverse, border: "transparent" };
