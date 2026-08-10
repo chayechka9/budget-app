@@ -19,11 +19,11 @@ import {
   startOfToday,
   toIsoDate,
   todayIso,
-} from "./dates";
+} from "./dates.ts";
 import {
   savingsHistoryForMonths,
   type SavingsMonthBalance,
-} from "./savings-history";
+} from "./savings-history.ts";
 
 /** Минимум, который нужен агрегации. `amount` со знаком: минус — трата. */
 export interface AnalyticsTransaction {
