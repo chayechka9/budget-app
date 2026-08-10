@@ -6,11 +6,13 @@ import {
   View,
   type GestureResponderEvent,
   type LayoutChangeEvent,
+  type AccessibilityActionEvent,
 } from "react-native";
 import Svg, { Circle, Line, Path } from "react-native-svg";
 
 import { colors, radius, typography } from "../constants/theme";
 import { labelStep, type Bucket } from "../lib/analytics";
+import { formatMoney } from "../lib/money";
 
 /** Больше этого числа столбиков в ширину экрана уже не помещается. */
 const FIT_LIMIT = 6;
@@ -80,11 +82,20 @@ function ChartScroller({
 function Column({
   width,
   onPress,
+  accessibilityLabel,
+  selected,
   children,
-}: PropsWithChildren<{ width: number | null; onPress: () => void }>) {
+}: PropsWithChildren<{
+  width: number | null;
+  onPress: () => void;
+  accessibilityLabel: string;
+  selected: boolean;
+}>) {
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityState={{ selected }}
       onPress={onPress}
       style={{
         flex: width === null ? 1 : undefined,
@@ -123,7 +134,13 @@ export function SpendingBars({ buckets, selectedKey, onSelect }: BarsProps) {
       {buckets.map((bucket, index) => {
         const selected = bucket.key === selectedKey;
         return (
-          <Column key={bucket.key} width={width} onPress={() => onSelect(bucket.key)}>
+          <Column
+            key={bucket.key}
+            width={width}
+            accessibilityLabel={`${bucket.label}, spending ${formatMoney(bucket.spent)}`}
+            selected={selected}
+            onPress={() => onSelect(bucket.key)}
+          >
             {/* Сумм над столбиками нет намеренно: подписи разной длины ломали
                 ряд, а точное значение и так открывается по тапу. Столбик
                 отвечает за пропорцию, карточка под графиком — за цифры. */}
@@ -171,7 +188,13 @@ export function IncomeExpenseBars({ buckets, selectedKey, onSelect }: BarsProps)
       {buckets.map((bucket, index) => {
         const selected = bucket.key === selectedKey;
         return (
-          <Column key={bucket.key} width={width} onPress={() => onSelect(bucket.key)}>
+          <Column
+            key={bucket.key}
+            width={width}
+            accessibilityLabel={`${bucket.label}, income ${formatMoney(bucket.income)}, spending ${formatMoney(bucket.spent)}`}
+            selected={selected}
+            onPress={() => onSelect(bucket.key)}
+          >
             <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 3 }}>
               <View
                 style={{
@@ -223,6 +246,9 @@ type SavingsChartProps = {
   values: number[];
   /** Точка, на которой стоит палец (или последняя, пока не трогали). */
   index: number;
+  monthLabel: string;
+  amountLabel: string;
+  changeLabel: string;
   onScrub: (index: number) => void;
 };
 
@@ -234,8 +260,24 @@ type SavingsChartProps = {
  * касания в номер точки, и держать два разных масштаба — верный способ
  * промахиваться мимо значения под пальцем.
  */
-export function SavingsChart({ values, index, onScrub }: SavingsChartProps) {
+export function SavingsChart({
+  values,
+  index,
+  monthLabel,
+  amountLabel,
+  changeLabel,
+  onScrub,
+}: SavingsChartProps) {
   const [width, setWidth] = useState(0);
+
+  const activeIndex =
+    values.length === 0 ? 0 : Math.min(Math.max(index, 0), values.length - 1);
+
+  const selectIndex = (nextIndex: number) => {
+    if (values.length === 0) return;
+    const clamped = Math.min(Math.max(nextIndex, 0), values.length - 1);
+    if (clamped !== activeIndex) onScrub(clamped);
+  };
 
   const onLayout = (event: LayoutChangeEvent) => {
     setWidth(event.nativeEvent.layout.width);
@@ -245,11 +287,16 @@ export function SavingsChart({ values, index, onScrub }: SavingsChartProps) {
     if (width <= 0 || values.length < 2) return;
     const x = event.nativeEvent.locationX;
     const fraction = Math.min(1, Math.max(0, x / width));
-    onScrub(Math.round(fraction * (values.length - 1)));
+    selectIndex(Math.round(fraction * (values.length - 1)));
   };
 
-  const min = Math.min(...values);
-  const max = Math.max(...values);
+  const accessibilityAction = (event: AccessibilityActionEvent) => {
+    if (event.nativeEvent.actionName === "increment") selectIndex(activeIndex + 1);
+    if (event.nativeEvent.actionName === "decrement") selectIndex(activeIndex - 1);
+  };
+
+  const min = values.length > 0 ? Math.min(...values) : 0;
+  const max = values.length > 0 ? Math.max(...values) : 0;
   const span = max - min || 1;
   const inner = Math.max(1, width - CHART_PADDING * 2);
   const step = values.length > 1 ? inner / (values.length - 1) : 0;
@@ -265,20 +312,45 @@ export function SavingsChart({ values, index, onScrub }: SavingsChartProps) {
   const line = points
     .map((point, position) => `${position === 0 ? "M" : "L"}${point.x} ${point.y}`)
     .join(" ");
-  const area = `${line} L${points[points.length - 1]?.x ?? 0} ${CHART_HEIGHT} L${points[0]?.x ?? 0} ${CHART_HEIGHT} Z`;
+  const area = line
+    ? `${line} L${points[points.length - 1].x} ${CHART_HEIGHT} L${points[0].x} ${CHART_HEIGHT} Z`
+    : "";
 
-  const active = points[Math.min(index, points.length - 1)];
+  const active = points[activeIndex];
+  const adjustable = values.length > 1;
 
   return (
     <View
+      accessible={values.length > 0}
+      accessibilityRole={adjustable ? "adjustable" : "image"}
+      accessibilityLabel="Savings growth"
+      accessibilityValue={
+        values.length > 0
+          ? { text: `${monthLabel}, ${amountLabel}, Change ${changeLabel}` }
+          : undefined
+      }
+      accessibilityHint={
+        adjustable
+          ? "Adjust to move to the previous or next month"
+          : "Only one month is available"
+      }
+      accessibilityActions={
+        adjustable
+          ? [
+              { name: "decrement", label: "Previous month" },
+              { name: "increment", label: "Next month" },
+            ]
+          : []
+      }
+      onAccessibilityAction={accessibilityAction}
       onLayout={onLayout}
-      onStartShouldSetResponder={() => true}
-      onMoveShouldSetResponder={() => true}
+      onStartShouldSetResponder={() => adjustable}
+      onMoveShouldSetResponder={() => adjustable}
       onResponderGrant={scrub}
       onResponderMove={scrub}
       style={{ height: CHART_HEIGHT }}
     >
-      {width > 0 ? (
+      {width > 0 && points.length > 0 ? (
         <Svg width={width} height={CHART_HEIGHT}>
           <Path d={area} fill={colors.positive} opacity={0.08} />
           <Path

@@ -223,8 +223,11 @@ export default function InsightsScreen() {
   const savActive =
     savings.length === 0
       ? 0
-      : Math.min(savIndex ?? savings.length - 1, savings.length - 1);
+      : Math.min(Math.max(savIndex ?? savings.length - 1, 0), savings.length - 1);
   const savedChange = savingsPoints[savActive]?.change ?? 0;
+  const savedMonthLabel = savingsBuckets[savActive]?.label ?? "";
+  const savedAmountLabel = formatMoney(savings[savActive]);
+  const savedChangeLabel = formatSignedMoney(savedChange);
 
   const applyPeriod = (target: PeriodTarget, next: PeriodSelection) => {
     if (target === "spending") {
@@ -467,18 +470,25 @@ export default function InsightsScreen() {
                 }}
               >
                 <Text style={[typography.captionSmall, { color: colors.textTertiary }]}>
-                  {savingsBuckets[savActive]?.label ?? ""}
+                  {savedMonthLabel}
                 </Text>
                 <Text style={[typography.amountCaption, { color: colors.textSecondary }]}>
-                  Change {formatSignedMoney(savedChange)}
+                  Change {savedChangeLabel}
                 </Text>
               </View>
               <Text style={[typography.amount, { color: colors.text }]}>
-                {formatMoney(savings[savActive])}
+                {savedAmountLabel}
               </Text>
 
               <View style={{ marginTop: 10 }}>
-                <SavingsChart values={savings} index={savActive} onScrub={setSavIndex} />
+                <SavingsChart
+                  values={savings}
+                  index={savActive}
+                  monthLabel={savedMonthLabel}
+                  amountLabel={savedAmountLabel}
+                  changeLabel={savedChangeLabel}
+                  onScrub={setSavIndex}
+                />
               </View>
 
               <View style={{ marginTop: spacing.sm }}>

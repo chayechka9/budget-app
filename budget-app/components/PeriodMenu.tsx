@@ -50,6 +50,7 @@ function Row({
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={label}
       accessibilityState={{ selected: active }}
       onPress={onPress}
       style={{ paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10 }}
@@ -101,12 +102,19 @@ export function PeriodMenu({
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Close period menu"
-        onPress={onClose}
+      <View
+        accessibilityViewIsModal
+        onAccessibilityEscape={onClose}
         style={{ flex: 1 }}
       >
+        {/* Фон и меню — siblings. Доступный Pressable-родитель скрыл бы строки
+            меню от VoiceOver, поэтому слой закрытия сам исключён из дерева. */}
+        <Pressable
+          accessible={false}
+          importantForAccessibility="no"
+          onPress={onClose}
+          style={{ position: "absolute", inset: 0 }}
+        />
         <View
           style={{
             position: "absolute",
@@ -124,11 +132,14 @@ export function PeriodMenu({
               key={option.label}
               label={option.label}
               active={value.count === option.selection.count}
-              onPress={() => onSelect(option.selection)}
+              onPress={() => {
+                onSelect(option.selection);
+                onClose();
+              }}
             />
           ))}
         </View>
-      </Pressable>
+      </View>
     </Modal>
   );
 }
