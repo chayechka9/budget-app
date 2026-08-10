@@ -39,6 +39,12 @@ export interface MockTransaction {
   /** Отрицательное — трата, положительное — доход. */
   amount: number;
   date: string;
+  /**
+   * Метки времени создания/изменения — есть только у записей, добавленных в
+   * сессии (задел под SQLite из Checkpoint 1). У моков их нет и не будет.
+   */
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export const MOCK_GROUPS: MockGroup[] = [

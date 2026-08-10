@@ -19,7 +19,8 @@ import {
   type MockTransaction,
 } from "./mock-data";
 import { isMoneyAmountWithinLimit } from "./money";
-import { currentMonthKey } from "./dates";
+import { currentMonthKey, nowIso } from "./dates";
+import { generateId } from "./id";
 import {
   buildSavingsHistory,
   savingsBalanceByCategory,
@@ -247,9 +248,12 @@ export function StoreProvider({ children }: PropsWithChildren) {
       addTransaction: (input) => {
         if (!isMoneyAmountWithinLimit(input.amount) || input.amount <= 0) return;
         const signedAmount = input.type === "income" ? input.amount : -input.amount;
+        const timestamp = nowIso();
         setAdded((current) => [
           {
-            id: `t-new-${current.length + 1}-${input.date}-${signedAmount}`,
+            // Стабильный id, не зависящий от порядка/даты/суммы записи —
+            // переживёт перенос на SQLite (Checkpoint 1).
+            id: generateId("t"),
             // У дохода в строке показываем источник, у расхода — заметку,
             // а если её нет — название категории.
             payee:
@@ -258,6 +262,8 @@ export function StoreProvider({ children }: PropsWithChildren) {
             icon: input.icon,
             amount: signedAmount,
             date: input.date,
+            createdAt: timestamp,
+            updatedAt: timestamp,
           },
           ...current,
         ]);

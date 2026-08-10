@@ -42,6 +42,11 @@ export function todayIso(): string {
   return toIsoDate(startOfToday());
 }
 
+/** Полная метка времени создания/изменения записи — не для отображения. */
+export function nowIso(): string {
+  return new Date().toISOString();
+}
+
 /** Ключ месяца для группировки и фильтров: «2026-08». */
 export function monthKeyOf(iso: string): string {
   return iso.slice(0, 7);
