@@ -38,6 +38,9 @@ function today(): string {
 const SEGMENTS: { value: TransactionType; label: string }[] = [
   { value: "expense", label: "Expense" },
   { value: "income", label: "Income" },
+  // Полное название «Starting balance» в треть ширины не помещается и
+  // обрезалось бы многоточием; целиком оно подписано под суммой.
+  { value: "starting_balance", label: "Starting" },
 ];
 
 const CATEGORY_PAGE_SIZE = 11;
@@ -376,8 +379,11 @@ export default function TransactionSheetScreen() {
   }
 
   const isIncome = type === "income";
-  // Доход — позитивное событие, поэтому акцент зелёный, а не тёмный.
-  const accent = isIncome ? colors.positive : colors.surfaceInverse;
+  // Стартовый баланс — это деньги, которые уже есть: выбирать ему нечего,
+  // ни категории, ни источника.
+  const isStartingBalance = type === "starting_balance";
+  // Приход — позитивное событие, поэтому акцент зелёный, а не тёмный.
+  const accent = isIncome || isStartingBalance ? colors.positive : colors.surfaceInverse;
   // Категории берём из стора, а не из моков: созданные в этой сессии должны
   // сразу быть доступны для трат.
   const options: TransactionOption[] = isIncome
@@ -397,7 +403,7 @@ export default function TransactionSheetScreen() {
     amount.trim().length > 0 &&
     parsedAmount > 0 &&
     isMoneyAmountWithinLimit(parsedAmount) &&
-    selected !== null;
+    (isStartingBalance || selected !== null);
   const isToday = date === today();
 
   /** Смена режима сбрасывает выбор: категории и источники не взаимозаменяемы. */
@@ -408,12 +414,13 @@ export default function TransactionSheetScreen() {
   };
 
   const save = () => {
-    if (!canSave || !selected) return;
+    if (!canSave) return;
+    if (!isStartingBalance && !selected) return;
     const input = {
       type,
       amount: parsedAmount,
-      categoryId: isIncome ? null : selected.id,
-      incomeSourceId: isIncome ? selected.id : null,
+      categoryId: type === "expense" ? (selected?.id ?? null) : null,
+      incomeSourceId: isIncome ? (selected?.id ?? null) : null,
       note,
       date,
     };
@@ -452,7 +459,7 @@ export default function TransactionSheetScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={{ marginTop: spacing.md }}>
-          <SegmentedControl segments={SEGMENTS} value={type} onChange={changeType} />
+          <SegmentedControl compact segments={SEGMENTS} value={type} onChange={changeType} />
         </View>
 
         {/* Сумма: крупный текст по центру, без рамки и без label */}
@@ -463,14 +470,16 @@ export default function TransactionSheetScreen() {
               color: amount ? accent : colors.textFaint,
               textAlign: "center",
               paddingTop: spacing.lg,
-              paddingBottom: isIncome ? spacing.xs : spacing.sm,
+              paddingBottom: isIncome || isStartingBalance ? spacing.xs : spacing.sm,
             },
           ]}
         >
-          {selected ? formatMoney(Number(amount || 0)) : `€${amount || "0"}`}
+          {selected || isStartingBalance
+            ? formatMoney(Number(amount || 0))
+            : `€${amount || "0"}`}
         </Text>
 
-        {isIncome ? (
+        {isIncome || isStartingBalance ? (
           <Text
             style={[
               typography.overline,
@@ -481,18 +490,20 @@ export default function TransactionSheetScreen() {
               },
             ]}
           >
-            Source
+            {isStartingBalance ? "Starting balance" : "Source"}
           </Text>
         ) : null}
 
         {/* Категории расхода или источники дохода */}
-        <CategoryPicker
-          options={options}
-          selected={selected}
-          income={isIncome}
-          accent={accent}
-          onSelect={setSelected}
-        />
+        {isStartingBalance ? null : (
+          <CategoryPicker
+            options={options}
+            selected={selected}
+            income={isIncome}
+            accent={accent}
+            onSelect={setSelected}
+          />
+        )}
 
         {/* Заметка и дата — в один ряд */}
         <View style={{ flexDirection: "row", gap: spacing.sm, marginTop: 14 }}>
