@@ -11,9 +11,8 @@ import { MonthPicker } from "../../components/MonthPicker";
 import { ProgressRing, spendProgress } from "../../components/Progress";
 import { ReadyToAssignPill } from "../../components/ReadyToAssignPill";
 import { colors, radius, spacing, typography } from "../../constants/theme";
-import { monthKeysTo, spentByCategoryIn } from "../../lib/analytics";
+import { monthKeysTo } from "../../lib/analytics";
 import { currentMonthKey, formatMonthKey, monthKeyOf } from "../../lib/dates";
-import { MOCK_LAST_MONTH } from "../../lib/mock-data";
 import { formatMoney } from "../../lib/money";
 import { useStore, type ResolvedCategory } from "../../lib/store";
 
@@ -94,7 +93,7 @@ function EmptyMonth({ monthKey }: { monthKey: string }) {
 export default function BudgetScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { groups, readyToAssign, transactions } = useStore();
+  const { groupsForMonth, monthSummary, readyToAssign, transactions } = useStore();
 
   const thisMonth = currentMonthKey();
 
@@ -128,52 +127,26 @@ export default function BudgetScreen() {
     });
   };
 
-  const spentByCategory = useMemo(
-    () => spentByCategoryIn(transactions, selected),
-    [transactions, selected],
-  );
-
   /**
    * Группы за выбранный месяц.
    *
-   * Текущий месяц отдаётся как есть: `spent` у категории уже про него, и
-   * пересчитывать его через транзакции значит развести Budget с Home.
-   *
-   * У прошлого месяца плана и накоплений в данных нет — они существуют только
-   * «на сейчас». Поэтому показываем ровно то, что известно: фактические траты
-   * из транзакций этого месяца, и только по тем категориям, где траты были.
-   * Придумывать историю плана или накоплений нельзя — это были бы числа
-   * из ниоткуда.
+   * План, траты и перенесённый остаток считает стор — по одной и той же
+   * цепочке месяцев для всех экранов. У закрытого месяца показываются только
+   * категории, в которых что-то происходило: заведённая позже категория к
+   * прошлому месяцу отношения не имеет.
    */
-  const monthGroups = useMemo<MonthGroup[]>(() => {
-    if (isCurrent) {
-      return groups.map((group) => ({
+  const monthGroups = useMemo<MonthGroup[]>(
+    () =>
+      groupsForMonth(selected).map((group) => ({
         id: group.id,
         name: group.name,
         categories: group.categories.map((category) => ({
           ...category,
           spent: category.spent ?? 0,
         })),
-      }));
-    }
-
-    return groups
-      .map((group) => ({
-        id: group.id,
-        name: group.name,
-        categories: group.categories
-          .filter((category) => category.kind === "fixed")
-          .map((category) => ({
-            ...category,
-            spent: category.matchNames.reduce(
-              (sum, name) => sum + (spentByCategory[name] ?? 0),
-              0,
-            ),
-          }))
-          .filter((category) => category.spent > 0),
-      }))
-      .filter((group) => group.categories.length > 0);
-  }, [groups, isCurrent, spentByCategory]);
+      })),
+    [groupsForMonth, selected],
+  );
 
   const fixed = monthGroups.flatMap((group) =>
     group.categories.filter((category) => category.kind === "fixed"),
@@ -190,7 +163,7 @@ export default function BudgetScreen() {
   // называть тот же остаток, иначе один и тот же июль показывает два числа.
   const isWrappedUp = months[1] !== undefined && selected === months[1];
   const closedLine = isWrappedUp
-    ? `${formatMoney(MOCK_LAST_MONTH.leftUnspent)} rolled forward`
+    ? `${formatMoney(monthSummary(selected).leftUnspent)} rolled forward`
     : `${formatMoney(leftOver)} left over`;
 
   // В месяце без единой записи остаток считать не из чего: «€0 left over»

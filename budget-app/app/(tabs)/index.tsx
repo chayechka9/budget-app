@@ -16,8 +16,12 @@ import {
   spacing,
   typography,
 } from "../../constants/theme";
-import { daysLeftInMonth } from "../../lib/dates";
-import { MOCK_LAST_MONTH, MOCK_MONTH_LABEL } from "../../lib/mock-data";
+import {
+  currentMonthKey,
+  daysLeftInMonth,
+  monthName,
+  previousMonthKey,
+} from "../../lib/dates";
 import { formatMoney } from "../../lib/money";
 import { useStore } from "../../lib/store";
 
@@ -26,7 +30,13 @@ const RECENT_COUNT = 3;
 export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { transactions, totalBalance, readyToAssign, categories } = useStore();
+  const { transactions, totalBalance, readyToAssign, categories, monthSummary } =
+    useStore();
+
+  const thisMonth = currentMonthKey();
+  // Итог прошлого месяца считается из тех же данных, что и Budget: карточка
+  // здесь и экран Wrapped up обязаны называть одно и то же число.
+  const lastMonth = monthSummary(previousMonthKey(thisMonth));
 
   // Сортируем по дате, а не берём первые из списка: добавленная транзакция
   // попадает в начало массива независимо от того, каким числом её записали,
@@ -56,7 +66,7 @@ export default function HomeScreen() {
     >
       {/* Месяц */}
       <Text style={[typography.overlineWide, { color: colors.textTertiary }]}>
-        {MOCK_MONTH_LABEL}
+        {monthName(thisMonth)}
       </Text>
 
       {/* Баланс */}
@@ -92,11 +102,11 @@ export default function HomeScreen() {
             <IconTile name="calendarCheck" size={42} tone="positive" />
             <View style={{ flex: 1 }}>
               <Text style={[typography.headline, { color: colors.text }]}>
-                {MOCK_LAST_MONTH.label} wrapped up
+                {lastMonth.label} wrapped up
               </Text>
               <Text style={[typography.caption, { color: colors.textSecondary, marginTop: 2 }]}>
                 <Text style={[typography.amountCaption, { color: colors.positiveText }]}>
-                  {formatMoney(MOCK_LAST_MONTH.leftUnspent)}
+                  {formatMoney(lastMonth.leftUnspent)}
                 </Text>{" "}
                 left unspent
               </Text>

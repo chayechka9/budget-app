@@ -17,7 +17,7 @@ import { Icon, type IconName } from "../components/Icon";
 import { NumericKeypad } from "../components/NumericKeypad";
 import { SegmentedControl } from "../components/SegmentedControl";
 import { colors, iconSize, radius, spacing, typography } from "../constants/theme";
-import { MOCK_INCOME_SOURCES, type MockTransaction } from "../lib/mock-data";
+import type { Transaction } from "../lib/types";
 import {
   appendMoneyKey,
   formatMoney,
@@ -42,7 +42,12 @@ const SEGMENTS: { value: TransactionType; label: string }[] = [
 
 const CATEGORY_PAGE_SIZE = 11;
 
-type TransactionOption = { name: string; icon: IconName };
+/**
+ * Категория расхода или источник дохода. `id` обязателен: запись ссылается на
+ * категорию идентификатором, а не названием, иначе переименование оторвало бы
+ * от неё историю.
+ */
+type TransactionOption = { id: string; name: string; icon: IconName };
 
 /** Один chip без изменений внешнего вида относительно прежнего списка. */
 function OptionChip({
@@ -122,9 +127,9 @@ function OptionCloud({
     >
       {options.map((option, index) => (
         <OptionChip
-          key={`${option.name}-${index}`}
+          key={option.id}
           option={option}
-          active={selected?.name === option.name}
+          active={selected?.id === option.id}
           income={income}
           accent={accent}
           onPress={() => onSelect(option)}
@@ -295,7 +300,7 @@ function CategoryPicker({
 }
 
 /** Стартовые значения формы: пустые для новой траты, текущие для правки. */
-function initialValues(editing: MockTransaction | undefined) {
+function initialValues(editing: Transaction | undefined) {
   if (!editing) {
     return {
       type: "expense" as TransactionType,
@@ -306,19 +311,18 @@ function initialValues(editing: MockTransaction | undefined) {
     };
   }
 
-  const income = editing.amount > 0;
+  const income = editing.type === "income";
   return {
-    type: (income ? "income" : "expense") as TransactionType,
+    type: editing.type,
     amount: String(Math.abs(editing.amount)),
     // У дохода выбран источник, у расхода — категория. Иконку берём из самой
     // записи: она уже та, что показывается в списке.
     selected: {
+      id: (income ? editing.incomeSourceId : editing.categoryId) ?? "",
       name: income ? editing.payee : editing.category,
       icon: editing.icon,
     } as TransactionOption,
-    // В `payee` у расхода лежит заметка, а если её не было — название
-    // категории. Второе в поле заметки показывать нечего.
-    note: !income && editing.payee !== editing.category ? editing.payee : "",
+    note: editing.note,
     date: editing.date,
   };
 }
@@ -335,8 +339,14 @@ export default function TransactionSheetScreen() {
   const close = useCloseScreen();
   const closeFlow = useCloseTransactionFlow();
   const { id } = useLocalSearchParams<{ id?: string }>();
-  const { addTransaction, updateTransaction, deleteTransaction, categories, transactions } =
-    useStore();
+  const {
+    addTransaction,
+    updateTransaction,
+    deleteTransaction,
+    categories,
+    incomeSources,
+    transactions,
+  } = useStore();
 
   const editing = id ? transactions.find((transaction) => transaction.id === id) : undefined;
   const initial = initialValues(editing);
@@ -370,9 +380,17 @@ export default function TransactionSheetScreen() {
   const accent = isIncome ? colors.positive : colors.surfaceInverse;
   // Категории берём из стора, а не из моков: созданные в этой сессии должны
   // сразу быть доступны для трат.
-  const options = isIncome
-    ? MOCK_INCOME_SOURCES
-    : categories.map((category) => ({ name: category.name, icon: category.icon }));
+  const options: TransactionOption[] = isIncome
+    ? incomeSources.map((source) => ({
+        id: source.id,
+        name: source.name,
+        icon: source.icon,
+      }))
+    : categories.map((category) => ({
+        id: category.id,
+        name: category.name,
+        icon: category.icon,
+      }));
 
   const parsedAmount = parseMoney(amount);
   const canSave =
@@ -394,8 +412,8 @@ export default function TransactionSheetScreen() {
     const input = {
       type,
       amount: parsedAmount,
-      label: selected.name,
-      icon: selected.icon,
+      categoryId: isIncome ? null : selected.id,
+      incomeSourceId: isIncome ? selected.id : null,
       note,
       date,
     };

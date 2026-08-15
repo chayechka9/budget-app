@@ -1,52 +1,91 @@
 import {
   createContext,
+  useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
-  type Dispatch,
   type PropsWithChildren,
-  type SetStateAction,
 } from "react";
 
 import type { IconName } from "../components/Icon";
 import {
-  DEMO_SAVINGS_EVENT_SEED,
-  MOCK_GROUPS,
-  MOCK_SUMMARY,
-  MOCK_TRANSACTIONS,
-  type CategoryKind,
-  type MockCategory,
-  type MockTransaction,
-} from "./mock-data";
-import { isMoneyAmountWithinLimit } from "./money";
-import { currentMonthKey, nowIso } from "./dates";
-import { generateId } from "./id";
+  buildCategoryMonths,
+  savingsEventsFrom,
+  statesForMonth,
+  type CategoryMonthState,
+} from "./budget.ts";
+import { currentMonthKey, monthName } from "./dates.ts";
+import { getDb } from "./db/open.ts";
 import {
-  buildSavingsHistory,
-  savingsBalanceByCategory,
-  savingsEventsForAssignment,
-  type SavingsEvent,
-  type SavingsMonthBalance,
-} from "./savings-history";
+  addAssigned,
+  listAllocations,
+  setAssigned,
+} from "./db/repositories/budget.ts";
+import {
+  archiveCategory as archiveCategoryRow,
+  findGroupByName,
+  insertCategory,
+  insertGroup,
+  listCategories,
+  listGroups,
+  restoreCategory as restoreCategoryRow,
+  updateCategory as updateCategoryRow,
+} from "./db/repositories/categories.ts";
+import { listIncomeSources } from "./db/repositories/income-sources.ts";
+import { ensureProfile } from "./db/repositories/profile.ts";
+import {
+  deleteSavingsGoal,
+  listSavingsGoals,
+  upsertSavingsGoal,
+} from "./db/repositories/savings-goals.ts";
+import {
+  insertTransaction,
+  listTransactions,
+  restoreTransaction,
+  softDeleteTransaction,
+  updateTransaction as updateTransactionRow,
+} from "./db/repositories/transactions.ts";
+import type { Db } from "./db/types.ts";
+import { seedStarterData } from "./db/seed.ts";
+import { isMoneyAmountWithinLimit } from "./money.ts";
+import { buildSavingsHistory, type SavingsMonthBalance } from "./savings-history.ts";
+import type {
+  BudgetAllocation,
+  Category,
+  CategoryGroup,
+  CategoryKind,
+  GoalCadence,
+  IncomeSource,
+  Profile,
+  SavingsGoal,
+  Transaction,
+  TransactionType,
+} from "./types.ts";
 
 /**
- * Временное хранилище в памяти.
+ * Хранилище приложения.
  *
- * Настоящее локальное хранение (expo-sqlite/AsyncStorage) — это Stage 1 из
- * BUDGET_APP_SPEC.md. Здесь только то, что нужно, чтобы действия реально
- * меняли цифры на экранах: моки из mock-data служат стартовым срезом, а
- * правки сессии накладываются поверх. При перезапуске всё сбрасывается.
+ * Единственный источник истины — SQLite. React-состояние здесь только кеш
+ * прочитанного: любое действие пишет в базу и перечитывает срез, поэтому
+ * данные переживают перезапуск, а экраны продолжают читать те же поля, что и
+ * раньше.
+ *
+ * Срез читается целиком, а не точечными запросами: личный бюджет — это тысячи
+ * строк в худшем случае, зато любой экран гарантированно видит одни и те же
+ * числа, а не свою версию баланса.
  */
 
-export type TransactionType = "expense" | "income";
+export type { TransactionType };
 
 export interface NewTransaction {
   type: TransactionType;
-  /** Всегда положительное число — знак проставляет стор. */
+  /** Всегда положительное число — знак проставляет слой данных. */
   amount: number;
-  /** Категория для расхода или источник для дохода. */
-  label: string;
-  icon: IconName;
+  /** Категория расхода. */
+  categoryId: string | null;
+  /** Источник дохода. */
+  incomeSourceId: string | null;
   note: string;
   date: string;
 }
@@ -58,76 +97,48 @@ export interface CategoryDraft {
   name: string;
   kind: CategoryKind;
   icon: IconName;
-  /** План на месяц у fixed, цель накопления у savings. */
-  amount: number;
+  /**
+   * План на месяц у обычной категории, цель у накопления. `null` — поле
+   * оставили пустым: категория без лимита и накопление без конечной цели
+   * одинаково допустимы.
+   */
+  amount: number | null;
   /** Существующая группа. */
   groupId: string;
   /** Непустое имя — создать группу с этим названием и положить категорию в неё. */
   newGroupName?: string;
+  /** Дата цели накопления. */
+  targetDate?: string | null;
+  /** Считать взнос по неделям или по месяцам. */
+  cadence?: GoalCadence | null;
 }
 
 /**
- * Поля записи, выведенные из заполненной формы. Одни и те же для новой
- * транзакции и для правки существующей — иначе созданная и отредактированная
- * запись начали бы по-разному называться в списке.
+ * Категория, посчитанная на конкретный месяц. Экраны берут только её и не
+ * складывают суммы у себя — иначе Home и Budget разъезжаются.
  */
-function transactionFieldsFrom(input: NewTransaction) {
-  return {
-    // У дохода в строке показываем источник, у расхода — заметку,
-    // а если её нет — название категории.
-    payee: input.type === "income" ? input.label : input.note.trim() || input.label,
-    category: input.type === "income" ? "Income" : input.label,
-    icon: input.icon,
-    // Расход уменьшает баланс, доход увеличивает.
-    amount: input.type === "income" ? input.amount : -input.amount,
-    date: input.date,
-  };
-}
-
-/** Название группы в id: «Fun money» → «fun-money». */
-function slugify(value: string): string {
-  return (
-    value
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-|-$/g, "") || "group"
-  );
-}
-
-/**
- * Группа, в которую ляжет категория. Для «New group» её id выводится из
- * названия, а сама группа заодно добавляется в список — так создание группы
- * и категории остаётся одним действием пользователя.
- */
-function resolveGroupId(
-  draft: CategoryDraft,
-  setExtraGroups: Dispatch<SetStateAction<{ id: string; name: string }[]>>,
-): string {
-  const newGroupName = draft.newGroupName?.trim();
-  if (!newGroupName) return draft.groupId;
-
-  const id = `g-new-${slugify(newGroupName)}`;
-  setExtraGroups((current) =>
-    current.some((group) => group.id === id)
-      ? current
-      : [...current, { id, name: newGroupName }],
-  );
-  return id;
-}
-
-/**
- * Категория с уже применёнными правками сессии. Экраны берут только её и не
- * складывают моки с дельтами у себя — иначе Home и Budget разъезжаются.
- */
-export interface ResolvedCategory extends MockCategory {
+export interface ResolvedCategory {
+  id: string;
+  name: string;
+  kind: CategoryKind;
+  icon: IconName;
   groupId: string;
   groupName: string;
   /**
-   * Названия, под которыми на категорию ссылаются транзакции: текущее и, если
-   * категорию переименовали, прежнее. Экраны фильтруют историю по этому списку,
-   * а не по `name`, иначе переименование прячет все прошлые траты.
+   * Сколько денег в категории: у обычной — план месяца вместе с перенесённым
+   * остатком, у накопления — всё накопленное.
    */
-  matchNames: string[];
+  assigned: number;
+  /** Потрачено за месяц. У накоплений не используется. */
+  spent?: number;
+  /** Цель накопления, если она задана. */
+  target?: number;
+  /** Дата цели и ритм взносов — только у цели с датой. */
+  targetDate?: string;
+  cadence?: GoalCadence;
+  /** Остаток, перенесённый из прошлого месяца. */
+  carriedIn: number;
+  archivedAt: string | null;
 }
 
 export interface ResolvedGroup {
@@ -136,24 +147,37 @@ export interface ResolvedGroup {
   categories: ResolvedCategory[];
 }
 
-/** Категория вместе с группой, в которой она лежит. */
-type PlacedCategory = MockCategory & { groupId: string };
-
-/** Она же с уже вычисленными именами для сопоставления с транзакциями. */
-type NamedCategory = PlacedCategory & { matchNames: string[] };
+/** Итог месяца — то, из чего собраны карточка Wrapped up и сравнение трат. */
+export interface MonthSummary {
+  key: string;
+  /** «July» — короткая подпись месяца. */
+  label: string;
+  /** Что осталось неистраченным и уехало в следующий месяц. */
+  leftUnspent: number;
+  /** Из чего сложился остаток, крупные первыми. */
+  breakdown: { name: string; amount: number }[];
+  /** Траты месяца по названиям категорий. */
+  spentByCategory: Record<string, number>;
+}
 
 interface Store {
-  transactions: MockTransaction[];
-  /** Фактические операции накопления, включая явно обозначенный demo seed. */
-  savingsEvents: SavingsEvent[];
-  /** Полная история баланса; период Insights только фильтрует эти точки. */
+  /** База прочитана хотя бы раз. */
+  ready: boolean;
+  transactions: Transaction[];
+  /** Полная история накоплений; период Insights только фильтрует эти точки. */
   savingsHistory: SavingsMonthBalance[];
-  /** Группы с учётом добавленных трат и распределённых денег. */
+  /** Группы текущего месяца без архивных категорий. */
   groups: ResolvedGroup[];
   /** Тот же список плоско — для поиска категории по id. */
   categories: ResolvedCategory[];
+  /** Архивные категории — для восстановления. */
+  archivedCategories: ResolvedCategory[];
+  incomeSources: IncomeSource[];
   totalBalance: number;
   readyToAssign: number;
+  /** Группы за любой месяц: в прошлом — только те, где что-то происходило. */
+  groupsForMonth: (monthKey: string) => ResolvedGroup[];
+  monthSummary: (monthKey: string) => MonthSummary;
   addTransaction: (input: NewTransaction) => void;
   /** Переписать существующую транзакцию значениями из формы. */
   updateTransaction: (id: string, input: NewTransaction) => void;
@@ -168,271 +192,371 @@ interface Store {
   assign: (amountByCategoryId: Record<string, number>) => void;
   addCategory: (draft: CategoryDraft) => void;
   updateCategory: (id: string, draft: CategoryDraft) => void;
+  /** Убрать категорию из новых операций, не трогая историю. */
+  archiveCategory: (id: string) => void;
+  restoreCategory: (id: string) => void;
+}
+
+/** Всё, что читается из базы за один проход. */
+interface Snapshot {
+  profile: Profile | null;
+  groups: CategoryGroup[];
+  categories: Category[];
+  incomeSources: IncomeSource[];
+  transactions: Transaction[];
+  allocations: BudgetAllocation[];
+  goals: SavingsGoal[];
+}
+
+const EMPTY_SNAPSHOT: Snapshot = {
+  profile: null,
+  groups: [],
+  categories: [],
+  incomeSources: [],
+  transactions: [],
+  allocations: [],
+  goals: [],
+};
+
+async function readSnapshot(db: Db): Promise<Snapshot> {
+  const [profile, groups, categories, incomeSources, transactions, allocations, goals] =
+    await Promise.all([
+      ensureProfile(db),
+      listGroups(db),
+      listCategories(db),
+      listIncomeSources(db),
+      listTransactions(db),
+      listAllocations(db),
+      listSavingsGoals(db),
+    ]);
+
+  return { profile, groups, categories, incomeSources, transactions, allocations, goals };
 }
 
 const StoreContext = createContext<Store | null>(null);
 
 export function StoreProvider({ children }: PropsWithChildren) {
-  const [added, setAdded] = useState<MockTransaction[]>([]);
-  /** Правки транзакций: id → изменённые поля. Моковые правятся так же. */
-  const [transactionEdits, setTransactionEdits] = useState<
-    Record<string, Partial<MockTransaction>>
-  >({});
-  /** id удалённых транзакций — запись просто исчезает из всех списков. */
-  const [deletedTransactionIds, setDeletedTransactionIds] = useState<string[]>([]);
+  const [snapshot, setSnapshot] = useState<Snapshot>(EMPTY_SNAPSHOT);
+  const [ready, setReady] = useState(false);
   const [pendingUndo, setPendingUndo] = useState<string | null>(null);
-  const [assignedByCategory, setAssignedByCategory] = useState<Record<string, number>>({});
-  const [savingsEvents, setSavingsEvents] = useState<SavingsEvent[]>(
-    DEMO_SAVINGS_EVENT_SEED,
-  );
-  /** Группы, созданные через «New group» в форме категории. */
-  const [extraGroups, setExtraGroups] = useState<{ id: string; name: string }[]>([]);
-  /** Категории, созданные в этой сессии. */
-  const [extraCategories, setExtraCategories] = useState<PlacedCategory[]>([]);
-  /** Правки существующих категорий: id → изменённые поля. */
-  const [edits, setEdits] = useState<Record<string, Partial<PlacedCategory>>>({});
+
+  /**
+   * Прогоняет запись и сразу перечитывает срез.
+   *
+   * Оптимистичных правок в состоянии нет намеренно: экран должен показывать
+   * то, что реально лежит в базе, иначе после перезапуска цифры «меняются
+   * сами». Запись локальная и занимает миллисекунды.
+   */
+  const write = useCallback(async (action: (db: Db) => Promise<void>) => {
+    const db = await getDb();
+    await action(db);
+    setSnapshot(await readSnapshot(db));
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      const db = await getDb();
+      await seedStarterData(db);
+      const next = await readSnapshot(db);
+      if (cancelled) return;
+      setSnapshot(next);
+      setReady(true);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const value = useMemo<Store>(() => {
-    const deleted = new Set(deletedTransactionIds);
-    /** Транзакция с уже применённой правкой сессии. */
-    const withEdits = (transaction: MockTransaction): MockTransaction =>
-      transactionEdits[transaction.id]
-        ? { ...transaction, ...transactionEdits[transaction.id] }
-        : transaction;
+    const { categories, groups, transactions, allocations, goals } = snapshot;
 
-    const transactions = [...added, ...MOCK_TRANSACTIONS]
-      .filter((transaction) => !deleted.has(transaction.id))
-      .map(withEdits);
-
-    /**
-     * Вклад транзакций в итоги поверх моковых цифр.
-     *
-     * Добавленная в сессии запись считается целиком. Моковая уже учтена и в
-     * MOCK_SUMMARY, и в `spent` категорий, поэтому попадает сюда только если
-     * её правили или удалили: минусом — прежний вклад, плюсом — то, чем она
-     * стала. Так правка расхода сама переносит трату между категориями.
-     */
-    const contributions: { transaction: MockTransaction; sign: 1 | -1 }[] = [];
-    for (const transaction of added) {
-      if (deleted.has(transaction.id)) continue;
-      contributions.push({ transaction: withEdits(transaction), sign: 1 });
-    }
-    for (const transaction of MOCK_TRANSACTIONS) {
-      const changed = transactionEdits[transaction.id] !== undefined;
-      const removed = deleted.has(transaction.id);
-      if (!changed && !removed) continue;
-      contributions.push({ transaction, sign: -1 });
-      if (!removed) contributions.push({ transaction: withEdits(transaction), sign: 1 });
-    }
-
-    // Расход уменьшает баланс, доход увеличивает.
-    const balanceDelta = contributions.reduce(
-      (sum, { transaction, sign }) => sum + sign * transaction.amount,
-      0,
+    const thisMonth = currentMonthKey();
+    const goalByCategory = new Map(goals.map((goal) => [goal.categoryId, goal]));
+    const groupById = new Map(groups.map((group) => [group.id, group]));
+    const savingsIds = new Set(
+      categories.filter((category) => category.kind === "savings").map(({ id }) => id),
     );
 
-    // Доход не привязан к категории: он пополняет пул нераспределённых денег.
-    const incomeDelta = contributions
-      .filter(({ transaction }) => transaction.amount > 0)
-      .reduce((sum, { transaction, sign }) => sum + sign * transaction.amount, 0);
+    // Один расчёт цепочки месяцев на все экраны: перенос остатка обязан быть
+    // одинаковым и в Budget, и в карточке категории, и в Insights.
+    const states = buildCategoryMonths(allocations, transactions, thisMonth);
 
-    const extraSpentByCategory: Record<string, number> = {};
-    for (const { transaction, sign } of contributions) {
-      if (transaction.amount >= 0) continue;
-      const spent = Math.abs(transaction.amount);
-      extraSpentByCategory[transaction.category] =
-        (extraSpentByCategory[transaction.category] ?? 0) + sign * spent;
-    }
+    // Срез по месяцу считается один раз: иначе каждая категория пересчитывала
+    // бы всю цепочку заново.
+    const monthIndex = new Map<string, Map<string, CategoryMonthState>>();
+    const monthState = (monthKey: string) => {
+      let byCategory = monthIndex.get(monthKey);
+      if (!byCategory) {
+        byCategory = statesForMonth(states, monthKey);
+        monthIndex.set(monthKey, byCategory);
+      }
+      return byCategory;
+    };
 
-    const assignedTotal = Object.values(assignedByCategory).reduce(
-      (sum, amount) => sum + amount,
-      0,
-    );
-    // Правки накладываются до раскладки по группам: смена группы — это тоже
-    // правка, и категория должна уехать в новую группу, а не остаться в старой.
-    const placed: NamedCategory[] = [
-      ...MOCK_GROUPS.flatMap((group) =>
-        group.categories.map((category) => ({ ...category, groupId: group.id })),
-      ),
-      ...extraCategories,
-    ].map((category) => {
-      const edited = { ...category, ...edits[category.id] };
-      // Транзакция ссылается на категорию по названию, а Edit его меняет.
-      // Старые траты записаны с прежним именем, новые — с текущим, поэтому
-      // категории принадлежат оба.
+    const resolveCategory = (
+      category: Category,
+      monthKey: string,
+    ): ResolvedCategory => {
+      const state = monthState(monthKey).get(category.id);
+      const carriedIn = state?.carriedIn ?? 0;
+      const assigned = state?.assigned ?? 0;
+      const spent = state?.spent ?? 0;
+      const available = state?.available ?? 0;
+      const goal = goalByCategory.get(category.id);
+
       return {
-        ...edited,
-        matchNames:
-          edited.name === category.name ? [category.name] : [category.name, edited.name],
+        id: category.id,
+        name: category.name,
+        kind: category.kind,
+        icon: category.icon,
+        groupId: category.groupId,
+        groupName: groupById.get(category.groupId)?.name ?? "",
+        // У накопления показываем всё, что на нём лежит; у обычной категории —
+        // деньги этого месяца вместе с перенесённым остатком.
+        assigned: category.kind === "savings" ? available : carriedIn + assigned,
+        spent: category.kind === "savings" ? undefined : spent,
+        target: goal?.targetAmount ?? undefined,
+        targetDate: goal?.targetDate ?? undefined,
+        cadence: goal?.cadence ?? undefined,
+        carriedIn,
+        archivedAt: category.archivedAt,
       };
-    });
+    };
 
-    // История и текущие balances используют только категории, которые сейчас
-    // являются savings. Это сохраняет общий итог при смене типа категории.
-    const savingsCategoryIds = new Set(
-      placed.filter((category) => category.kind === "savings").map(({ id }) => id),
-    );
-    const activeSavingsEvents = savingsEvents.filter((event) =>
-      savingsCategoryIds.has(event.categoryId),
-    );
-    const savingsByCategory = savingsBalanceByCategory(activeSavingsEvents);
-    const savingsHistory = buildSavingsHistory(activeSavingsEvents, currentMonthKey());
+    const buildGroups = (monthKey: string, includeIdle: boolean): ResolvedGroup[] => {
+      const monthStates = monthState(monthKey);
 
-    const groups: ResolvedGroup[] = [
-      ...MOCK_GROUPS.map(({ id, name }) => ({ id, name })),
-      ...extraGroups,
-    ].map((group) => ({
-      id: group.id,
-      name: group.name,
-      categories: placed
-        .filter((category) => category.groupId === group.id)
-        .map((category) => ({
-          ...category,
-          groupName: group.name,
-          // У savings единственный источник баланса — фактические события.
-          // Обычные категории по-прежнему используют месячный план + Assign.
-          assigned:
-            category.kind === "savings"
-              ? (savingsByCategory[category.id] ?? 0)
-              : category.assigned + (assignedByCategory[category.id] ?? 0),
-          spent:
-            category.kind === "fixed"
-              ? (category.spent ?? 0) +
-                category.matchNames.reduce(
-                  (sum, name) => sum + (extraSpentByCategory[name] ?? 0),
-                  0,
-                )
-              : category.spent,
-        })),
-    }));
+      return groups
+        .map((group) => ({
+          id: group.id,
+          name: group.name,
+          categories: categories
+            .filter((category) => category.groupId === group.id)
+            .filter((category) => category.archivedAt === null)
+            .filter((category) => {
+              if (includeIdle) return true;
+              // В закрытом месяце показываем только то, что в нём реально
+              // происходило: категория, заведённая позже, к нему отношения
+              // не имеет.
+              const state = monthStates.get(category.id);
+              if (!state) return false;
+              return state.assigned !== 0 || state.spent !== 0 || state.carriedIn !== 0;
+            })
+            .map((category) => resolveCategory(category, monthKey)),
+        }))
+        .filter((group) => includeIdle || group.categories.length > 0);
+    };
+
+    const currentGroups = buildGroups(thisMonth, true);
+    const currentCategories = currentGroups.flatMap((group) => group.categories);
+
+    // Баланс — это всё, что пришло, минус всё, что потрачено. Отдельного
+    // «начального» числа нет: стартовый баланс такая же запись, как остальные.
+    const totalBalance = transactions.reduce(
+      (sum, transaction) => sum + transaction.amount,
+      0,
+    );
+
+    // В пул нераспределённых денег попадают доходы и стартовый баланс;
+    // уходит из него всё, что разложено по категориям в любом месяце.
+    const inflow = transactions
+      .filter((transaction) => transaction.type !== "expense")
+      .reduce((sum, transaction) => sum + transaction.amount, 0);
+    const assignedTotal = allocations.reduce(
+      (sum, allocation) => sum + allocation.assigned,
+      0,
+    );
+
+    const savingsHistory = buildSavingsHistory(
+      savingsEventsFrom(allocations, transactions, savingsIds),
+      thisMonth,
+    );
+
+    const monthSummary = (monthKey: string): MonthSummary => {
+      const monthStates = monthState(monthKey);
+      const nameById = new Map(categories.map((category) => [category.id, category.name]));
+
+      const breakdown: { name: string; amount: number }[] = [];
+      const spentByCategory: Record<string, number> = {};
+      let leftUnspent = 0;
+
+      for (const category of categories) {
+        if (category.kind !== "fixed") continue;
+        const state = monthStates.get(category.id);
+        if (!state) continue;
+
+        leftUnspent += state.available;
+        if (state.available > 0) {
+          breakdown.push({
+            name: nameById.get(category.id) ?? "",
+            amount: state.available,
+          });
+        }
+        if (state.spent > 0) {
+          spentByCategory[nameById.get(category.id) ?? ""] = state.spent;
+        }
+      }
+
+      return {
+        key: monthKey,
+        label: monthName(monthKey),
+        leftUnspent,
+        breakdown: breakdown.sort((first, second) => second.amount - first.amount),
+        spentByCategory,
+      };
+    };
+
+    /** Группа для категории: существующая или заведённая по имени из формы. */
+    const resolveGroupId = async (db: Db, draft: CategoryDraft): Promise<string> => {
+      const newGroupName = draft.newGroupName?.trim();
+      if (!newGroupName) return draft.groupId;
+
+      const existing = await findGroupByName(db, newGroupName);
+      if (existing) return existing.id;
+      return (await insertGroup(db, { name: newGroupName })).id;
+    };
+
+    /** Сумма из формы: план месяца у обычной категории, цель у накопления. */
+    const applyDraftAmount = async (db: Db, id: string, draft: CategoryDraft) => {
+      if (draft.kind === "savings") {
+        await upsertSavingsGoal(db, id, {
+          targetAmount: draft.amount,
+          targetDate: draft.targetDate ?? null,
+          cadence: draft.cadence ?? null,
+        });
+        return;
+      }
+
+      // Обычная категория цели не имеет: если тип поменяли, цель уходит.
+      await deleteSavingsGoal(db, id);
+      // Пустое поле — категория без лимита. Это не то же самое, что план на
+      // ноль, поэтому раскладку не трогаем вовсе.
+      if (draft.amount !== null) {
+        await setAssigned(db, currentMonthKey(), id, draft.amount);
+      }
+    };
+
+    const validAmount = (amount: number | null): boolean =>
+      amount === null || (isMoneyAmountWithinLimit(amount) && amount >= 0);
 
     return {
+      ready,
       transactions,
-      savingsEvents,
       savingsHistory,
-      groups,
-      categories: groups.flatMap((group) => group.categories),
-      totalBalance: MOCK_SUMMARY.totalBalance + balanceDelta,
-      readyToAssign: MOCK_SUMMARY.readyToAssign + incomeDelta - assignedTotal,
+      groups: currentGroups,
+      categories: currentCategories,
+      archivedCategories: categories
+        .filter((category) => category.archivedAt !== null)
+        .map((category) => resolveCategory(category, thisMonth)),
+      incomeSources: snapshot.incomeSources,
+      totalBalance,
+      readyToAssign: inflow - assignedTotal,
+      groupsForMonth: (monthKey) => buildGroups(monthKey, monthKey === thisMonth),
+      monthSummary,
+
       addTransaction: (input) => {
         if (!isMoneyAmountWithinLimit(input.amount) || input.amount <= 0) return;
-        const timestamp = nowIso();
-        setAdded((current) => [
-          {
-            // Стабильный id, не зависящий от порядка/даты/суммы записи —
-            // переживёт перенос на SQLite (Checkpoint 1).
-            id: generateId("t"),
-            ...transactionFieldsFrom(input),
-            createdAt: timestamp,
-            updatedAt: timestamp,
-          },
-          ...current,
-        ]);
+        void write((db) =>
+          insertTransaction(db, {
+            type: input.type,
+            amount: input.amount,
+            categoryId: input.type === "expense" ? input.categoryId : null,
+            incomeSourceId: input.type === "income" ? input.incomeSourceId : null,
+            note: input.note,
+            date: input.date,
+          }).then(() => undefined),
+        );
       },
+
       updateTransaction: (id, input) => {
         if (!isMoneyAmountWithinLimit(input.amount) || input.amount <= 0) return;
-        setTransactionEdits((current) => ({
-          ...current,
-          [id]: {
-            ...current[id],
-            ...transactionFieldsFrom(input),
-            updatedAt: nowIso(),
-          },
-        }));
+        void write((db) =>
+          updateTransactionRow(db, id, {
+            type: input.type,
+            amount: input.amount,
+            categoryId: input.type === "expense" ? input.categoryId : null,
+            incomeSourceId: input.type === "income" ? input.incomeSourceId : null,
+            note: input.note,
+            date: input.date,
+          }),
+        );
       },
+
       deleteTransaction: (id) => {
         if (!transactions.some((transaction) => transaction.id === id)) return;
-        setDeletedTransactionIds((current) =>
-          current.includes(id) ? current : [...current, id],
-        );
-        // Удаление обратимо, пока на экране висит Undo, поэтому правки записи
-        // не стираем: вернуться она должна такой же, какой была.
+        // Запись остаётся в базе с меткой удаления: Undo должен вернуть её
+        // ровно такой, какой она была.
         setPendingUndo(id);
+        void write((db) => softDeleteTransaction(db, id));
       },
+
       pendingUndo,
       undoDelete: () => {
         if (!pendingUndo) return;
-        setDeletedTransactionIds((current) =>
-          current.filter((id) => id !== pendingUndo),
-        );
+        const id = pendingUndo;
         setPendingUndo(null);
+        void write((db) => restoreTransaction(db, id));
       },
       dismissUndo: () => setPendingUndo(null),
-      assign: (amountByCategoryId) => {
-        const validAmounts = Object.fromEntries(
-          Object.entries(amountByCategoryId).filter(
-            ([, amount]) => isMoneyAmountWithinLimit(amount) && amount > 0,
-          ),
-        );
 
-        setAssignedByCategory((current) => {
-          const next = { ...current };
-          for (const [categoryId, amount] of Object.entries(validAmounts)) {
-            next[categoryId] = (next[categoryId] ?? 0) + amount;
+      assign: (amountByCategoryId) => {
+        const valid = Object.entries(amountByCategoryId).filter(
+          ([, amount]) => isMoneyAmountWithinLimit(amount) && amount > 0,
+        );
+        if (valid.length === 0) return;
+
+        void write(async (db) => {
+          for (const [categoryId, amount] of valid) {
+            await addAssigned(db, currentMonthKey(), categoryId, amount);
           }
-          return next;
         });
-        setSavingsEvents((current) => [
-          ...current,
-          ...savingsEventsForAssignment(validAmounts, placed, current.length),
-        ]);
       },
+
       addCategory: (draft) => {
-        if (!isMoneyAmountWithinLimit(draft.amount)) return;
-        const groupId = resolveGroupId(draft, setExtraGroups);
-        setExtraCategories((current) => [
-          ...current,
-          {
-            id: `c-new-${slugify(draft.name)}-${current.length + 1}`,
+        if (!validAmount(draft.amount)) return;
+        const name = draft.name.trim();
+        if (!name) return;
+
+        void write(async (db) => {
+          const groupId = await resolveGroupId(db, draft);
+          const category = await insertCategory(db, {
             groupId,
-            name: draft.name.trim(),
+            name,
             kind: draft.kind,
             icon: draft.icon,
-            // У fixed сумма из формы — план на месяц; у savings это цель, а
-            // накоплено пока ноль.
-            assigned: draft.kind === "fixed" ? draft.amount : 0,
-            spent: draft.kind === "fixed" ? 0 : undefined,
-            target: draft.kind === "savings" ? draft.amount : undefined,
-          },
-        ]);
+          });
+          await applyDraftAmount(db, category.id, draft);
+        });
       },
+
       updateCategory: (id, draft) => {
-        if (!isMoneyAmountWithinLimit(draft.amount)) return;
-        const groupId = resolveGroupId(draft, setExtraGroups);
-        setEdits((current) => ({
-          ...current,
-          [id]: {
-            ...current[id],
+        if (!validAmount(draft.amount)) return;
+        const name = draft.name.trim();
+        if (!name) return;
+
+        void write(async (db) => {
+          const groupId = await resolveGroupId(db, draft);
+          await updateCategoryRow(db, id, {
             groupId,
-            name: draft.name.trim(),
+            name,
             kind: draft.kind,
             icon: draft.icon,
-            ...(draft.kind === "fixed"
-              ? // Сумма из формы — это уже итоговый план вместе с разложенным
-                // на категорию. Хранить её как есть нельзя: раскладка
-                // прибавится к ней второй раз. Обнулять раскладку тоже нельзя —
-                // тогда те же деньги вернутся в Ready to assign и появятся
-                // дважды. Поэтому храним план за вычетом раскладки.
-                {
-                  assigned: draft.amount - (assignedByCategory[id] ?? 0),
-                  target: undefined,
-                }
-              : { target: draft.amount }),
-          },
-        }));
+          });
+          await applyDraftAmount(db, id, draft);
+        });
+      },
+
+      archiveCategory: (id) => {
+        void write((db) => archiveCategoryRow(db, id));
+      },
+      restoreCategory: (id) => {
+        void write((db) => restoreCategoryRow(db, id));
       },
     };
-  }, [
-    added,
-    transactionEdits,
-    deletedTransactionIds,
-    pendingUndo,
-    assignedByCategory,
-    savingsEvents,
-    extraGroups,
-    extraCategories,
-    edits,
-  ]);
+  }, [snapshot, ready, pendingUndo, write]);
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
 }

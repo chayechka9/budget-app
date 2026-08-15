@@ -8,10 +8,16 @@ import { ModalScreen } from "../components/ModalScreen";
 import { SegmentedControl } from "../components/SegmentedControl";
 import { TransactionRow } from "../components/TransactionRow";
 import { colors, radius, spacing, typography } from "../constants/theme";
-import { dayOfMonth, formatDayLabel, recentDays } from "../lib/dates";
-import { MOCK_LAST_MONTH, type MockTransaction } from "../lib/mock-data";
+import {
+  currentMonthKey,
+  dayOfMonth,
+  formatDayLabel,
+  previousMonthKey,
+  recentDays,
+} from "../lib/dates";
 import { formatMoney, formatSignedMoney } from "../lib/money";
-import { useStore, type ResolvedCategory } from "../lib/store";
+import { useStore, type MonthSummary, type ResolvedCategory } from "../lib/store";
+import type { Transaction } from "../lib/types";
 
 type SpendingView = "trend" | "day" | "top";
 
@@ -23,14 +29,20 @@ const TOP_COUNT = 6;
 
 const MAX_BAR_HEIGHT = 84;
 
-function isExpense(transaction: MockTransaction): boolean {
+function isExpense(transaction: Transaction): boolean {
   return transaction.amount < 0;
 }
 
 /** Вкладка Trend: как месяц идёт относительно прошлого, по категориям. */
-function TrendView({ categories }: { categories: ResolvedCategory[] }) {
+function TrendView({
+  categories,
+  previous,
+}: {
+  categories: ResolvedCategory[];
+  previous: MonthSummary;
+}) {
   const router = useRouter();
-  const lastMonth = MOCK_LAST_MONTH.spentByCategory;
+  const lastMonth = previous.spentByCategory;
 
   const spending = categories
     .filter((category) => category.kind === "fixed")
@@ -46,16 +58,16 @@ function TrendView({ categories }: { categories: ResolvedCategory[] }) {
 
   const note =
     delta > 0.005
-      ? `more than ${MOCK_LAST_MONTH.label}`
+      ? `more than ${previous.label}`
       : delta < -0.005
-        ? `less than ${MOCK_LAST_MONTH.label}`
-        : `even with ${MOCK_LAST_MONTH.label}`;
+        ? `less than ${previous.label}`
+        : `even with ${previous.label}`;
 
   return (
     <>
       <Card style={{ marginTop: 18 }}>
         <Text style={[typography.caption, { color: colors.textSecondary }]}>
-          Compared with {MOCK_LAST_MONTH.label}
+          Compared with {previous.label}
         </Text>
         <View
           style={{
@@ -79,9 +91,11 @@ function TrendView({ categories }: { categories: ResolvedCategory[] }) {
 
       <Card list style={{ marginTop: spacing.md }}>
         {spending.map((category, index) => {
-          const previous = lastMonth[category.name];
+          const previousSpent = lastMonth[category.name];
           const categoryDelta =
-            previous === undefined ? undefined : (category.spent ?? 0) - previous;
+            previousSpent === undefined
+              ? undefined
+              : (category.spent ?? 0) - previousSpent;
 
           return (
             <CardRow
@@ -125,8 +139,8 @@ function TrendView({ categories }: { categories: ResolvedCategory[] }) {
                     ]}
                   >
                     {Math.abs(categoryDelta) < 0.005
-                      ? `Same as ${MOCK_LAST_MONTH.label}`
-                      : `${formatSignedMoney(categoryDelta)} vs ${MOCK_LAST_MONTH.label}`}
+                      ? `Same as ${previous.label}`
+                      : `${formatSignedMoney(categoryDelta)} vs ${previous.label}`}
                   </Text>
                 )}
               </View>
@@ -143,7 +157,7 @@ function ByDayView({
   transactions,
   plannedTotal,
 }: {
-  transactions: MockTransaction[];
+  transactions: Transaction[];
   plannedTotal: number;
 }) {
   const days = recentDays(CHART_DAYS);
@@ -245,7 +259,7 @@ function ByDayView({
 }
 
 /** Вкладка Top expenses: самые крупные траты за последние 30 дней. */
-function TopExpensesView({ transactions }: { transactions: MockTransaction[] }) {
+function TopExpensesView({ transactions }: { transactions: Transaction[] }) {
   const router = useRouter();
   const window = new Set(recentDays(TOP_WINDOW_DAYS));
 
@@ -313,7 +327,8 @@ function TopExpensesView({ transactions }: { transactions: MockTransaction[] }) 
 }
 
 export default function SpendingScreen() {
-  const { transactions, categories } = useStore();
+  const { transactions, categories, monthSummary } = useStore();
+  const previous = monthSummary(previousMonthKey(currentMonthKey()));
   const [view, setView] = useState<SpendingView>("trend");
 
   const plannedTotal = categories
@@ -340,7 +355,9 @@ export default function SpendingScreen() {
         />
       </View>
 
-      {view === "trend" ? <TrendView categories={categories} /> : null}
+      {view === "trend" ? (
+        <TrendView categories={categories} previous={previous} />
+      ) : null}
       {view === "day" ? (
         <ByDayView transactions={transactions} plannedTotal={plannedTotal} />
       ) : null}

@@ -9,7 +9,7 @@ import { Input } from "../components/Input";
 import { ModalScreen } from "../components/ModalScreen";
 import { SegmentedControl } from "../components/SegmentedControl";
 import { colors, radius, spacing, typography } from "../constants/theme";
-import type { CategoryKind } from "../lib/mock-data";
+import type { CategoryKind } from "../lib/types";
 import { isMoneyAmountWithinLimit, sanitizeMoneyInput } from "../lib/money";
 import { useStore, type ResolvedCategory } from "../lib/store";
 import { useCloseScreen } from "../lib/navigation";

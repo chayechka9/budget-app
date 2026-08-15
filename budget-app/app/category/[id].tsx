@@ -137,10 +137,10 @@ export default function CategoryDetailScreen() {
     );
   }
 
-  // Транзакции связаны с категорией по названию — id у них появится вместе
-  // с настоящим хранилищем.
+  // Связь с категорией — по id, поэтому переименование категории не прячет
+  // её прошлые траты.
   const matching = transactions
-    .filter((transaction) => category.matchNames.includes(transaction.category))
+    .filter((transaction) => transaction.categoryId === category.id)
     .slice()
     .sort((a, b) => b.date.localeCompare(a.date));
 

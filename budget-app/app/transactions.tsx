@@ -10,14 +10,14 @@ import { MonthPicker } from "../components/MonthPicker";
 import { TransactionRow } from "../components/TransactionRow";
 import { colors, spacing, typography } from "../constants/theme";
 import { formatDayLabel, formatMonthKey, monthKeyOf } from "../lib/dates";
-import { type MockTransaction } from "../lib/mock-data";
+import type { Transaction } from "../lib/types";
 import { useStore } from "../lib/store";
 import { useCloseScreen } from "../lib/navigation";
 
-type Day = { key: string; label: string; items: MockTransaction[] };
+type Day = { key: string; label: string; items: Transaction[] };
 
 /** Транзакции месяца, сгруппированные по дню, от свежих к старым. */
-function groupByDay(transactions: MockTransaction[]): Day[] {
+function groupByDay(transactions: Transaction[]): Day[] {
   const days: Day[] = [];
 
   for (const transaction of [...transactions].sort((a, b) => b.date.localeCompare(a.date))) {

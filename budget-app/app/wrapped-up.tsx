@@ -4,15 +4,19 @@ import { Card } from "../components/Card";
 import { Icon } from "../components/Icon";
 import { ModalScreen } from "../components/ModalScreen";
 import { HAIRLINE, colors, radius, spacing, typography } from "../constants/theme";
-import { MOCK_LAST_MONTH } from "../lib/mock-data";
+import { currentMonthKey, previousMonthKey } from "../lib/dates";
 import { formatMoney, formatSignedMoney } from "../lib/money";
+import { useStore } from "../lib/store";
 
 /**
- * Итог закрытого месяца. Пока только сводка: выбор, что делать с остатком
- * (перенести по категориям / в одну / в Ready to assign), требует настоящего
- * закрытия месяца — это Stage 1.
+ * Итог закрытого месяца: сколько осталось неистраченным и из каких категорий
+ * это сложилось. Остаток не «лежит отдельно» — он перенесён в те же категории
+ * следующего месяца, и разбивка показывает именно их.
  */
 export default function WrappedUpScreen() {
+  const { monthSummary } = useStore();
+  const lastMonth = monthSummary(previousMonthKey(currentMonthKey()));
+
   return (
     <ModalScreen>
       <View
@@ -30,11 +34,11 @@ export default function WrappedUpScreen() {
       </View>
 
       <Text style={[typography.overlineWide, { color: colors.textTertiary, marginTop: spacing.xl }]}>
-        {MOCK_LAST_MONTH.label}, wrapped
+        {lastMonth.label}, wrapped
       </Text>
 
       <Text style={[typography.hero, { color: colors.positiveText, marginTop: 6 }]}>
-        {formatMoney(MOCK_LAST_MONTH.leftUnspent)}
+        {formatMoney(lastMonth.leftUnspent)}
       </Text>
 
       <Text style={[typography.body, { color: colors.textSecondary, marginTop: 4 }]}>
@@ -42,7 +46,7 @@ export default function WrappedUpScreen() {
       </Text>
 
       <Card style={{ marginTop: spacing.xl, paddingVertical: 6, paddingHorizontal: 18 }}>
-        {MOCK_LAST_MONTH.breakdown.map((item, index) => (
+        {lastMonth.breakdown.map((item, index) => (
           <View
             key={item.name}
             style={{

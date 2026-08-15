@@ -63,6 +63,19 @@ export function formatMonthKey(key: string): string {
   return `${MONTHS_LONG[month - 1]} ${year}`;
 }
 
+/** Только название месяца: «2026-08» → «August». */
+export function monthName(key: string): string {
+  const month = Number(key.split("-")[1]);
+  return MONTHS_LONG[month - 1] ?? key;
+}
+
+/** Предыдущий календарный месяц: «2026-01» → «2025-12». */
+export function previousMonthKey(key: string): string {
+  const [year, month] = key.split("-").map(Number);
+  const previous = new Date(year, month - 2, 1);
+  return `${previous.getFullYear()}-${String(previous.getMonth() + 1).padStart(2, "0")}`;
+}
+
 /** Заголовок группы дня в Activity: «Today» / «Yesterday» / «2 Aug». */
 export function formatDayLabel(iso: string): string {
   const date = parseIsoDate(iso);
