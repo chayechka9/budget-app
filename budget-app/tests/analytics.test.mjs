@@ -151,3 +151,17 @@ test("switching savings period only filters existing history points", () => {
     ],
   );
 });
+
+test("a starting balance is not income of its month", () => {
+  const transactions = [
+    { date: `${monthKey(0)}-01`, amount: 500, category: "Starting balance", type: "starting_balance" },
+    { date: `${monthKey(0)}-02`, amount: 3200, category: "Income", type: "income" },
+    { date: `${monthKey(0)}-03`, amount: -50, category: "Groceries", type: "expense" },
+  ];
+
+  const [bucket] = bucketsFor(transactions, { kind: "preset", count: 1 });
+
+  assert.equal(bucket.income, 3200);
+  assert.equal(bucket.spent, 50);
+  assert.equal(bucket.net, 3150);
+});

@@ -30,6 +30,12 @@ export interface AnalyticsTransaction {
   date: string;
   amount: number;
   category: string;
+  /**
+   * Стартовый баланс приходит с плюсом, но доходом месяца не является: это
+   * деньги, которые уже были. В суммы периода он не попадает, хотя границу
+   * «за всё время» отодвигает — история начинается именно с него.
+   */
+  type?: "expense" | "income" | "starting_balance";
 }
 
 /**
@@ -154,6 +160,7 @@ export function bucketsFor(
   const byKey = new Map(buckets.map((bucket) => [bucket.key, bucket]));
 
   for (const transaction of transactions) {
+    if (transaction.type === "starting_balance") continue;
     if (transaction.date < window.from || transaction.date > window.to) continue;
     const bucket = byKey.get(monthKeyOf(transaction.date));
     if (!bucket) continue;
