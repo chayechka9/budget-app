@@ -79,13 +79,17 @@ export const MIGRATIONS: Migration[] = [
       // сумму все экраны и вся агрегация, поэтому знак не переизобретаем.
       // `type` отделяет стартовый баланс от дохода: деньги он приносит, но
       // доходом не считается и в Insights как доход не показывается.
+      //
+      // Подписи строки («Tesco», «Salary») здесь нет намеренно: она выводится
+      // при чтении из заметки, категории или источника дохода. Хранимая копия
+      // разошлась бы с ними при первом же переименовании категории, а роадмап
+      // требует, чтобы новое имя было видно во всей истории.
       `CREATE TABLE transactions (
         id TEXT PRIMARY KEY NOT NULL,
         type TEXT NOT NULL CHECK (type IN ('expense', 'income', 'starting_balance')),
         amount REAL NOT NULL,
         category_id TEXT REFERENCES categories(id),
         income_source_id TEXT REFERENCES income_sources(id),
-        payee TEXT NOT NULL,
         note TEXT NOT NULL DEFAULT '',
         date TEXT NOT NULL,
         deleted_at TEXT,

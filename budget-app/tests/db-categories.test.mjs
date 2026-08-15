@@ -122,9 +122,9 @@ test("archiving keeps the transaction history pointing at the category", async (
 
   const now = "2026-08-15T10:00:00.000Z";
   await db.runAsync(
-    `INSERT INTO transactions (id, type, amount, category_id, payee, note, date, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ["t-1", "expense", -12.5, category.id, "Tesco", "", "2026-08-02", now, now],
+    `INSERT INTO transactions (id, type, amount, category_id, note, date, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ["t-1", "expense", -12.5, category.id, "Tesco", "2026-08-02", now, now],
   );
 
   await archiveCategory(db, category.id);
@@ -150,9 +150,9 @@ test("renaming a category renames it across the whole history", async () => {
 
   const now = "2026-08-15T10:00:00.000Z";
   await db.runAsync(
-    `INSERT INTO transactions (id, type, amount, category_id, payee, note, date, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ["t-old", "expense", -12.5, category.id, "Tesco", "", "2025-01-02", now, now],
+    `INSERT INTO transactions (id, type, amount, category_id, note, date, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ["t-old", "expense", -12.5, category.id, "Tesco", "2025-01-02", now, now],
   );
 
   await updateCategory(db, category.id, {

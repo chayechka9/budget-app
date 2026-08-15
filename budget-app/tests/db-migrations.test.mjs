@@ -101,8 +101,8 @@ test("transactions reference categories and keep a signed amount", async () => {
     ["c-1", "g-1", "Groceries", "fixed", "groceries", 0, now, now],
   );
   await db.runAsync(
-    "INSERT INTO transactions (id, type, amount, category_id, payee, note, date, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-    ["t-1", "expense", -42.18, "c-1", "Tesco", "", "2026-08-02", now, now],
+    "INSERT INTO transactions (id, type, amount, category_id, note, date, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+    ["t-1", "expense", -42.18, "c-1", "Tesco", "2026-08-02", now, now],
   );
 
   const row = await db.getFirstAsync(
