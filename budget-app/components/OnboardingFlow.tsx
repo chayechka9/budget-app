@@ -54,6 +54,15 @@ const AMOUNT_TEXT_METRICS = {
   lineHeight: undefined,
 };
 
+/** Запас справа от последней цифры, чтобы каретка не упиралась в край поля. */
+const CARET_ROOM = 3;
+
+/**
+ * Ширина поля до первого замера — примерно одна цифра. Нужна только на первый
+ * кадр: дальше её заменяет измеренная.
+ */
+const DIGIT_WIDTH_GUESS = 28;
+
 const GOALS: { id: OnboardingGoal; label: string }[] = [
   { id: "understand", label: "Understand my spending" },
   { id: "save", label: "Save more" },
@@ -125,6 +134,8 @@ export function OnboardingFlow({ onDone }: { onDone: (result: OnboardingResult) 
   /** Поле баланса уже трогали — цифра перестаёт быть подсказкой. */
   const [touched, setTouched] = useState(false);
   const amountInput = useRef<TextInput>(null);
+  /** Ширина набранной суммы в пикселях — её замеряет невидимая копия текста. */
+  const [measuredWidth, setMeasuredWidth] = useState(0);
 
   /** Символ и цифры всегда одного цвета — это одна сумма, а не два элемента. */
   const amountColor = touched ? colors.text : colors.textPlaceholderLarge;
@@ -297,7 +308,13 @@ export function OnboardingFlow({ onDone }: { onDone: (result: OnboardingResult) 
                 отдельным `Text` перед полем и не редактируется, поэтому курсор
                 физически не может встать левее него, а цифры и каретка идут
                 следом. Нажатие на всю строку, включая символ, ставит курсор в
-                поле — иначе тапнуть мимо было бы слишком легко. */}
+                поле — иначе тапнуть мимо было бы слишком легко.
+
+                Отличие от Assign: там поле фиксированной ширины, здесь она
+                считается по набранному. Фиксированная ширина оставляет справа
+                пустоту, и пара уезжает от центра экрана тем сильнее, чем
+                короче сумма. Плата за точный центр — € смещается на доли
+                ширины цифры при каждом нажатии. */}
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Enter your starting balance"
@@ -331,9 +348,10 @@ export function OnboardingFlow({ onDone }: { onDone: (result: OnboardingResult) 
                   typography.amountSheet,
                   {
                     ...AMOUNT_TEXT_METRICS,
-                    // Ширина из макета. Хватает на «12345.67»: столько стоит
-                    // ожидать от стартового баланса, набранного руками.
-                    width: 200,
+                    // Ширина ровно по набранному, поэтому пара «€ + сумма»
+                    // всегда центрируется целиком. Пара пикселей сверху — под
+                    // каретку: вплотную она обрезалась бы краем поля.
+                    width: measuredWidth > 0 ? measuredWidth + CARET_ROOM : DIGIT_WIDTH_GUESS,
                     padding: 0,
                     margin: 0,
                     color: amountColor,
@@ -341,6 +359,22 @@ export function OnboardingFlow({ onDone }: { onDone: (result: OnboardingResult) 
                 ]}
               />
             </Pressable>
+
+            {/* Невидимая копия того же текста тем же шрифтом — только чтобы
+                узнать его ширину. Считать её из длины строки нельзя: точка
+                уже цифры, а сами цифры зависят от шрифта устройства. Копия
+                вынута из потока и не участвует в раскладке. */}
+            <Text
+              aria-hidden
+              numberOfLines={1}
+              onLayout={(event) => setMeasuredWidth(event.nativeEvent.layout.width)}
+              style={[
+                typography.amountSheet,
+                { ...AMOUNT_TEXT_METRICS, position: "absolute", opacity: 0 },
+              ]}
+            >
+              {balance || "0"}
+            </Text>
 
             <Pressable
               accessibilityRole="button"
