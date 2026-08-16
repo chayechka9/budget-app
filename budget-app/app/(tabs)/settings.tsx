@@ -3,7 +3,6 @@ import { useRouter } from "expo-router";
 import { ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { Button } from "../../components/Button";
 import { Card, CardRow } from "../../components/Card";
 import { Icon } from "../../components/Icon";
 import { IconTile } from "../../components/IconTile";
@@ -83,14 +82,24 @@ export default function SettingsScreen() {
       </Card>
 
       <SectionLabel>Budget setup</SectionLabel>
-      <Card>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
+      <Card list>
+        <CardRow
+          first
+          accessibilityLabel="Archived categories"
+          accessibilityHint="Opens the archive, where archived categories can be restored."
+          onPress={() => router.push("/archived-categories")}
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 14,
+            paddingHorizontal: spacing.lg,
+            paddingVertical: spacing.lg,
+          }}
+        >
           <IconTile name="budget" />
           <View style={{ flex: 1 }}>
-            <Text
-              style={[typography.headline, { color: colors.text }]}
-            >
-              Categories
+            <Text style={[typography.rowTitle, { color: colors.text }]}>
+              Archived categories
             </Text>
             <Text
               style={[
@@ -98,24 +107,11 @@ export default function SettingsScreen() {
                 { color: colors.textSecondary, marginTop: 2 },
               ]}
             >
-              Add categories or edit the ones already in your budget.
+              Categories you archived, ready to be brought back.
             </Text>
           </View>
-        </View>
-        <Button
-          label="Manage categories"
-          variant="muted"
-          accessibilityHint="Opens the Budget tab, where categories can be added or edited."
-          onPress={() => router.navigate("/(tabs)/budget")}
-          style={{ marginTop: spacing.lg }}
-        />
-        <Button
-          label="Archived categories"
-          variant="muted"
-          accessibilityHint="Opens the archive, where archived categories can be restored."
-          onPress={() => router.push("/archived-categories")}
-          style={{ marginTop: spacing.sm }}
-        />
+          <Icon name="chevronRight" size={iconSize.chevron} color={colors.textFaint} />
+        </CardRow>
       </Card>
 
       <SectionLabel>About</SectionLabel>
