@@ -77,8 +77,9 @@ export default function WrappedUpScreen() {
         }}
       >
         <Text style={[typography.caption, { color: colors.textSecondary }]}>
-          The leftover is already part of your Ready to assign balance — put it to work
-          whenever you like.
+          Each amount carried over into the same category this month, so it&apos;s
+          already there. Anything overspent carries over the same way. Nothing went
+          back to Ready to assign.
         </Text>
       </View>
     </ModalScreen>
