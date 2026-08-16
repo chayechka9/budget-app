@@ -5,8 +5,10 @@ import Head from "expo-router/head";
 import { StatusBar } from "expo-status-bar";
 import { View } from "react-native";
 
+import { OnboardingFlow } from "../components/OnboardingFlow";
 import { UndoToast } from "../components/UndoToast";
-import { StoreProvider } from "../lib/store";
+import { colors } from "../constants/theme";
+import { StoreProvider, useStore } from "../lib/store";
 
 /**
  * Экраны, которые в макете лежат поверх всего и закрываются крестиком.
@@ -49,7 +51,38 @@ export default function RootLayout() {
         {/* Поверх стека: удаление закрывает сразу два экрана, и тост должен
             пережить их обоих. */}
         <UndoToast />
+
+        <FirstRun />
       </View>
     </StoreProvider>
+  );
+}
+
+/**
+ * Первый запуск: онбординг поверх всего приложения.
+ *
+ * Слоем, а не отдельным маршрутом — так вкладки под ним уже смонтированы и
+ * после `Done` показываются сразу, без перехода. Пока база не прочитана,
+ * слой держит пустой фон: иначе на долю секунды мелькнул бы интерфейс с
+ * нулевым балансом, а следом — онбординг.
+ */
+function FirstRun() {
+  const { ready, onboarded, completeOnboarding } = useStore();
+
+  if (ready && onboarded) return null;
+
+  return (
+    <View
+      style={{
+        position: "absolute",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: colors.background,
+      }}
+    >
+      {ready ? <OnboardingFlow onDone={completeOnboarding} /> : null}
+    </View>
   );
 }

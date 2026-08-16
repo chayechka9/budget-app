@@ -19,6 +19,12 @@ export type TransactionType = "expense" | "income" | "starting_balance";
 
 export type SavingsGoalKind = "target" | "target_date" | "open";
 
+/**
+ * Ответ на «What brings you here?» в онбординге. `other` — свой вариант,
+ * текст к нему пользователь пишет сам.
+ */
+export type OnboardingGoal = "understand" | "save" | "stop" | "explore" | "other";
+
 export type GoalCadence = "weekly" | "monthly";
 
 export interface Profile {

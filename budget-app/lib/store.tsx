@@ -15,7 +15,7 @@ import {
   statesForMonth,
   type CategoryMonthState,
 } from "./budget.ts";
-import { currentMonthKey, monthName } from "./dates.ts";
+import { currentMonthKey, monthName, todayIso } from "./dates.ts";
 import { getDb } from "./db/open.ts";
 import {
   addAssigned,
@@ -32,8 +32,9 @@ import {
   restoreCategory as restoreCategoryRow,
   updateCategory as updateCategoryRow,
 } from "./db/repositories/categories.ts";
+import { recordEvent } from "./db/repositories/analytics-events.ts";
 import { listIncomeSources } from "./db/repositories/income-sources.ts";
-import { ensureProfile } from "./db/repositories/profile.ts";
+import { ensureProfile, markOnboarded } from "./db/repositories/profile.ts";
 import {
   deleteSavingsGoal,
   listSavingsGoals,
@@ -49,6 +50,7 @@ import {
 import type { Db } from "./db/types.ts";
 import { seedStarterData } from "./db/seed.ts";
 import { isMoneyAmountWithinLimit } from "./money.ts";
+import { onboardingWrites, type OnboardingResult } from "./onboarding.ts";
 import { buildSavingsHistory, type SavingsMonthBalance } from "./savings-history.ts";
 import type {
   BudgetAllocation,
@@ -77,6 +79,7 @@ import type {
  */
 
 export type { TransactionType };
+export type { OnboardingResult };
 
 export interface NewTransaction {
   type: TransactionType;
@@ -163,6 +166,8 @@ export interface MonthSummary {
 interface Store {
   /** База прочитана хотя бы раз. */
   ready: boolean;
+  /** Онбординг уже пройден — показывать его второй раз нельзя. */
+  onboarded: boolean;
   transactions: Transaction[];
   /** Полная история накоплений; период Insights только фильтрует эти точки. */
   savingsHistory: SavingsMonthBalance[];
@@ -195,6 +200,8 @@ interface Store {
   /** Убрать категорию из новых операций, не трогая историю. */
   archiveCategory: (id: string) => void;
   restoreCategory: (id: string) => void;
+  /** Закрыть онбординг: записать цель, стартовый баланс и отметить профиль. */
+  completeOnboarding: (result: OnboardingResult) => void;
 }
 
 /** Всё, что читается из базы за один проход. */
@@ -444,6 +451,9 @@ export function StoreProvider({ children }: PropsWithChildren) {
 
     return {
       ready,
+      // Пока профиль не прочитан, считаем онбординг непройденным — но экраны
+      // всё равно ждут `ready`, так что показать его дважды это не даёт.
+      onboarded: snapshot.profile?.onboardedAt != null,
       transactions,
       savingsHistory,
       groups: currentGroups,
@@ -554,6 +564,32 @@ export function StoreProvider({ children }: PropsWithChildren) {
       },
       restoreCategory: (id) => {
         void write((db) => restoreCategoryRow(db, id));
+      },
+
+      completeOnboarding: (result) => {
+        const { event, startingBalance } = onboardingWrites(result);
+
+        void write(async (db) => {
+          if (event) await recordEvent(db, event.name, event.props);
+
+          // Стартовый баланс — обычная транзакция своего типа, такая же, как
+          // всё остальное в истории.
+          if (startingBalance !== null) {
+            await insertTransaction(db, {
+              type: "starting_balance",
+              amount: startingBalance,
+              categoryId: null,
+              incomeSourceId: null,
+              note: "",
+              date: todayIso(),
+            });
+          }
+
+          // Отметка стоит последней: если что-то выше упадёт, онбординг
+          // повторится, а не пропадёт вместе с ответами.
+          const profile = snapshot.profile ?? (await ensureProfile(db));
+          await markOnboarded(db, profile.id);
+        });
       },
     };
   }, [snapshot, ready, pendingUndo, write]);
