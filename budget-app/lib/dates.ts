@@ -47,6 +47,19 @@ export function nowIso(): string {
   return new Date().toISOString();
 }
 
+/**
+ * Время суток из метки создания записи: «2026-08-16T19:04:11.812Z» → «22:04».
+ *
+ * Метка хранится в UTC, а показывать её нужно в часовом поясе устройства —
+ * поэтому разбор идёт через `Date`, а не срезом строки. Метка, которую не
+ * удалось разобрать, показывается прочерком: выдумывать время нельзя.
+ */
+export function formatTimeOfDay(iso: string): string {
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) return "—";
+  return `${String(at.getHours()).padStart(2, "0")}:${String(at.getMinutes()).padStart(2, "0")}`;
+}
+
 /** Ключ месяца для группировки и фильтров: «2026-08». */
 export function monthKeyOf(iso: string): string {
   return iso.slice(0, 7);

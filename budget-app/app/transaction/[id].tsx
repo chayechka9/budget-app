@@ -6,8 +6,7 @@ import { Card } from "../../components/Card";
 import { IconTile } from "../../components/IconTile";
 import { ModalScreen } from "../../components/ModalScreen";
 import { HAIRLINE, colors, spacing, typography } from "../../constants/theme";
-import { formatDayLabel } from "../../lib/dates";
-import { transactionMethod, transactionTime } from "../../lib/mock-data";
+import { formatDayLabel, formatTimeOfDay } from "../../lib/dates";
 import { formatSignedMoney } from "../../lib/money";
 import { useCloseScreen } from "../../lib/navigation";
 import { useStore } from "../../lib/store";
@@ -94,8 +93,9 @@ export default function TransactionDetailScreen() {
 
       <Card style={{ marginTop: 18, paddingVertical: spacing.sm }}>
         <DetailRow first label="Date" value={formatDayLabel(transaction.date)} />
-        <DetailRow label="Time" value={transactionTime(transaction.id)} />
-        <DetailRow label="Method" value={transactionMethod(transaction.id, income)} />
+        {/* Время — момент, когда запись была создана в приложении. Способа
+            оплаты в модели нет, и выдуманной строки «Method» здесь тоже нет. */}
+        <DetailRow label="Added at" value={formatTimeOfDay(transaction.createdAt)} />
       </Card>
 
       {/* Кнопки во всю ширину: в макете они 46px внутри узкого диалога, здесь

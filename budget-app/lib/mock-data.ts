@@ -400,35 +400,3 @@ export const MOCK_SUMMARY = {
   /** Ещё не распределено по категориям. */
   readyToAssign: 314.2,
 };
-
-function hashId(id: string): number {
-  let hash = 0;
-  for (let index = 0; index < id.length; index++) {
-    hash = (hash * 31 + id.charCodeAt(index)) >>> 0;
-  }
-  return hash;
-}
-
-/**
- * Время и способ оплаты транзакции. В моках их нет, а карточка детали их
- * показывает — выводим из id, чтобы значение было стабильным между рендерами
- * и не «прыгало». Настоящие поля появятся вместе с хранилищем на Stage 1.
- */
-export function transactionTime(id: unknown): string {
-  if (typeof id !== "string" || id.length === 0) return "—";
-
-  const hash = hashId(id);
-  const hours = 8 + (hash % 13);
-  // `hash` — беззнаковое 32-битное число. Знаковый сдвиг `>>` превращал
-  // значения с установленным старшим битом в отрицательные минуты.
-  const minutes = (hash >>> 3) % 60;
-  if (!Number.isInteger(hours) || hours < 0 || hours > 23) return "—";
-  if (!Number.isInteger(minutes) || minutes < 0 || minutes > 59) return "—";
-
-  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
-}
-
-export function transactionMethod(id: string, isIncome: boolean): string {
-  if (isIncome) return "Transfer";
-  return hashId(id) % 3 === 0 ? "Cash" : "Card";
-}
