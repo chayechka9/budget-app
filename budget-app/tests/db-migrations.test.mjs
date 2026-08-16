@@ -9,6 +9,7 @@ import {
 import { createTestDb } from "./helpers/test-db.mjs";
 
 const EXPECTED_TABLES = [
+  "analytics_events",
   "app_meta",
   "budget_allocations",
   "budget_months",

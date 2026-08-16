@@ -147,6 +147,26 @@ export const MIGRATIONS: Migration[] = [
       )`,
     ],
   },
+  {
+    version: 2,
+    statements: [
+      // Продуктовая аналитика. Провайдера (PostHog из плана) ещё нет, поэтому
+      // события копятся локально и уедут наружу, когда он появится, — но
+      // собирать их надо уже сейчас, иначе первые недели беты останутся без
+      // данных.
+      //
+      // `props` — JSON, и роадмап прямо ограничивает, что в него класть: ни
+      // сумм, ни заметок, ни продавцов, ни списка транзакций. Только сам факт
+      // события и его безобидные подробности.
+      `CREATE TABLE analytics_events (
+        id TEXT PRIMARY KEY NOT NULL,
+        name TEXT NOT NULL,
+        props TEXT NOT NULL DEFAULT '{}',
+        created_at TEXT NOT NULL
+      )`,
+      `CREATE INDEX analytics_events_name_idx ON analytics_events(name)`,
+    ],
+  },
 ];
 
 export const LATEST_SCHEMA_VERSION = MIGRATIONS.reduce(
