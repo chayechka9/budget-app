@@ -35,12 +35,15 @@ function today(): string {
   return `${now.getFullYear()}-${month}-${day}`;
 }
 
+/**
+ * Стартового баланса здесь нет намеренно: он задаётся один раз в онбординге и
+ * заводить его повторно из формы транзакции нельзя. Уже созданную запись
+ * править можно — тогда сегменты не показываются вовсе, менять ей тип
+ * некуда.
+ */
 const SEGMENTS: { value: TransactionType; label: string }[] = [
   { value: "expense", label: "Expense" },
   { value: "income", label: "Income" },
-  // Полное название «Starting balance» в треть ширины не помещается и
-  // обрезалось бы многоточием; целиком оно подписано под суммой.
-  { value: "starting_balance", label: "Starting" },
 ];
 
 const CATEGORY_PAGE_SIZE = 11;
@@ -380,7 +383,8 @@ export default function TransactionSheetScreen() {
 
   const isIncome = type === "income";
   // Стартовый баланс — это деньги, которые уже есть: выбирать ему нечего,
-  // ни категории, ни источника.
+  // ни категории, ни источника. Новым он больше не создаётся — только
+  // открывается на правку тот, что завёл онбординг.
   const isStartingBalance = type === "starting_balance";
   // Приход — позитивное событие, поэтому акцент зелёный, а не тёмный.
   const accent = isIncome || isStartingBalance ? colors.positive : colors.surfaceInverse;
@@ -458,9 +462,11 @@ export default function TransactionSheetScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <View style={{ marginTop: spacing.md }}>
-          <SegmentedControl compact segments={SEGMENTS} value={type} onChange={changeType} />
-        </View>
+        {isStartingBalance ? null : (
+          <View style={{ marginTop: spacing.md }}>
+            <SegmentedControl compact segments={SEGMENTS} value={type} onChange={changeType} />
+          </View>
+        )}
 
         {/* Сумма: крупный текст по центру, без рамки и без label */}
         <Text
