@@ -271,43 +271,30 @@ export function OnboardingFlow({ onDone }: { onDone: (result: OnboardingResult) 
 
             <View style={{ flex: 1 }} />
 
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 2,
+            {/* Символ и сумма — одна строка в одном поле, как крупная сумма в
+                шите транзакции: они стоят вплотную и центрируются вместе, а не
+                разъезжаются по краям. Символ живёт прямо в значении, потому
+                что `sanitizeMoneyInput` всё равно оставляет от ввода только
+                цифры и точку — стереть или сдвинуть € пользователь не может. */}
+            <TextInput
+              value={balance ? `€${balance}` : ""}
+              onChangeText={(next) => {
+                setTouched(true);
+                setBalance((current) => sanitizeMoneyInput(next, current));
               }}
-            >
-              <Text
-                style={[
-                  typography.amountSheet,
-                  { color: touched ? colors.text : colors.textPlaceholderLarge },
-                ]}
-              >
-                €
-              </Text>
-              <TextInput
-                value={balance}
-                onChangeText={(next) => {
-                  setTouched(true);
-                  setBalance((current) => sanitizeMoneyInput(next, current));
-                }}
-                onFocus={() => setTouched(true)}
-                placeholder="0"
-                placeholderTextColor={colors.textPlaceholderLarge}
-                keyboardType="decimal-pad"
-                accessibilityLabel="Starting balance"
-                style={[
-                  typography.amountSheet,
-                  {
-                    width: 200,
-                    textAlign: "center",
-                    color: touched ? colors.text : colors.textPlaceholderLarge,
-                  },
-                ]}
-              />
-            </View>
+              onFocus={() => setTouched(true)}
+              placeholder="€0"
+              placeholderTextColor={colors.textPlaceholderLarge}
+              keyboardType="decimal-pad"
+              accessibilityLabel="Starting balance"
+              style={[
+                typography.amountSheet,
+                {
+                  textAlign: "center",
+                  color: touched ? colors.text : colors.textPlaceholderLarge,
+                },
+              ]}
+            />
 
             <Pressable
               accessibilityRole="button"
