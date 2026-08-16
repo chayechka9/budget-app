@@ -42,6 +42,7 @@ export default function RootLayout() {
           <Stack.Screen name="wrapped-up" options={MODAL} />
           <Stack.Screen name="category/[id]" options={MODAL} />
           <Stack.Screen name="category-form" options={MODAL} />
+          <Stack.Screen name="archived-categories" options={MODAL} />
           <Stack.Screen name="transaction/[id]" options={MODAL} />
         </Stack>
 

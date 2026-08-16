@@ -109,6 +109,13 @@ export default function SettingsScreen() {
           onPress={() => router.navigate("/(tabs)/budget")}
           style={{ marginTop: spacing.lg }}
         />
+        <Button
+          label="Archived categories"
+          variant="muted"
+          accessibilityHint="Opens the archive, where archived categories can be restored."
+          onPress={() => router.push("/archived-categories")}
+          style={{ marginTop: spacing.sm }}
+        />
       </Card>
 
       <SectionLabel>About</SectionLabel>
