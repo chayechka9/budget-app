@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -35,6 +35,24 @@ const WELCOME = 0;
 const GOAL = 1;
 const BALANCE = 2;
 const STEP_COUNT = 3;
+
+/**
+ * Одинаковые метрики шрифта для префикса `€` и для поля с цифрами — тот же
+ * приём, что в поле раскладки на Assign.
+ *
+ * `lineHeight: undefined` здесь обязателен: `typography.amountSheet` приносит
+ * `lineHeight: 58`, и на iOS он двигает глиф внутри line box у `Text`, но к
+ * однострочному `TextInput` не применяется вовсе. Две разные схемы выкладки на
+ * одной строке разводят символ и цифры по вертикали. Без `lineHeight` обе
+ * коробки живут по метрикам шрифта, и `alignItems: "center"` ставит их на одну
+ * базовую линию. Подробный разбор — в `app/assign.tsx`.
+ */
+const AMOUNT_TEXT_METRICS = {
+  fontSize: 50,
+  fontWeight: "700" as const,
+  letterSpacing: -1.5,
+  lineHeight: undefined,
+};
 
 const GOALS: { id: OnboardingGoal; label: string }[] = [
   { id: "understand", label: "Understand my spending" },
@@ -106,6 +124,10 @@ export function OnboardingFlow({ onDone }: { onDone: (result: OnboardingResult) 
   const [balance, setBalance] = useState("");
   /** Поле баланса уже трогали — цифра перестаёт быть подсказкой. */
   const [touched, setTouched] = useState(false);
+  const amountInput = useRef<TextInput>(null);
+
+  /** Символ и цифры всегда одного цвета — это одна сумма, а не два элемента. */
+  const amountColor = touched ? colors.text : colors.textPlaceholderLarge;
 
   const finish = (withBalance: boolean) => {
     const amount = parseMoney(balance);
@@ -271,30 +293,54 @@ export function OnboardingFlow({ onDone }: { onDone: (result: OnboardingResult) 
 
             <View style={{ flex: 1 }} />
 
-            {/* Символ и сумма — одна строка в одном поле, как крупная сумма в
-                шите транзакции: они стоят вплотную и центрируются вместе, а не
-                разъезжаются по краям. Символ живёт прямо в значении, потому
-                что `sanitizeMoneyInput` всё равно оставляет от ввода только
-                цифры и точку — стереть или сдвинуть € пользователь не может. */}
-            <TextInput
-              value={balance ? `€${balance}` : ""}
-              onChangeText={(next) => {
-                setTouched(true);
-                setBalance((current) => sanitizeMoneyInput(next, current));
+            {/* Символ и поле — как в строке раскладки на Assign: € живёт
+                отдельным `Text` перед полем и не редактируется, поэтому курсор
+                физически не может встать левее него, а цифры и каретка идут
+                следом. Нажатие на всю строку, включая символ, ставит курсор в
+                поле — иначе тапнуть мимо было бы слишком легко. */}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Enter your starting balance"
+              onPress={() => amountInput.current?.focus()}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 0,
               }}
-              onFocus={() => setTouched(true)}
-              placeholder="€0"
-              placeholderTextColor={colors.textPlaceholderLarge}
-              keyboardType="decimal-pad"
-              accessibilityLabel="Starting balance"
-              style={[
-                typography.amountSheet,
-                {
-                  textAlign: "center",
-                  color: touched ? colors.text : colors.textPlaceholderLarge,
-                },
-              ]}
-            />
+            >
+              <Text
+                style={[typography.amountSheet, { ...AMOUNT_TEXT_METRICS, color: amountColor }]}
+              >
+                €
+              </Text>
+              <TextInput
+                ref={amountInput}
+                value={balance}
+                onChangeText={(next) => {
+                  setTouched(true);
+                  setBalance((current) => sanitizeMoneyInput(next, current));
+                }}
+                onFocus={() => setTouched(true)}
+                placeholder="0"
+                placeholderTextColor={colors.textPlaceholderLarge}
+                keyboardType="decimal-pad"
+                inputMode="decimal"
+                accessibilityLabel="Starting balance"
+                style={[
+                  typography.amountSheet,
+                  {
+                    ...AMOUNT_TEXT_METRICS,
+                    // Ширина из макета. Хватает на «12345.67»: столько стоит
+                    // ожидать от стартового баланса, набранного руками.
+                    width: 200,
+                    padding: 0,
+                    margin: 0,
+                    color: amountColor,
+                  },
+                ]}
+              />
+            </Pressable>
 
             <Pressable
               accessibilityRole="button"
