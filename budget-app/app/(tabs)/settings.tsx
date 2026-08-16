@@ -55,7 +55,7 @@ export default function SettingsScreen() {
           first
           accessible
           accessibilityRole="text"
-          accessibilityLabel="Data stays on this device. This prototype keeps changes for the current app session only. Cloud backup and sync are not available yet."
+          accessibilityLabel="Stored on this device. Everything you add is saved on this iPhone and stays there after you close the app. Cloud backup and sync are not available yet."
           style={{
             flexDirection: "row",
             alignItems: "center",
@@ -67,7 +67,7 @@ export default function SettingsScreen() {
           <IconTile name="wallet" />
           <View style={{ flex: 1 }}>
             <Text style={[typography.rowTitle, { color: colors.text }]}>
-              On this device
+              Stored on this device
             </Text>
             <Text
               style={[
@@ -75,8 +75,8 @@ export default function SettingsScreen() {
                 { color: colors.textSecondary, marginTop: 2 },
               ]}
             >
-              Changes are kept for this app session only. Cloud backup and sync
-              aren&apos;t available yet.
+              Everything you add is saved on this iPhone and stays there after you
+              close the app. Cloud backup and sync aren&apos;t available yet.
             </Text>
           </View>
         </CardRow>
